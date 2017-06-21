@@ -1,0 +1,10 @@
+
+*.zip
+*.pdf
+
+*.aux
+*.log
+*.toc
+*.out
+
+

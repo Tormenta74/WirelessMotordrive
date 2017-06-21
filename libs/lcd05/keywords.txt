@@ -1,0 +1,11 @@
+lcd05   KEYWORD1
+set_display_type        KEYWORD2
+clear_screen            KEYWORD2
+cursor_home             KEYWORD2
+set_cursor              KEYWORD2
+set_cursor_coords       KEYWORD2
+show_blinking_cursor    KEYWORD2
+backlight_on            KEYWORD2
+backlight_off           KEYWORD2
+ascii_chars             KEYWORD2
+read_fifo_length        KEYWORD2
