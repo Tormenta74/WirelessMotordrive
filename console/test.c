@@ -3,28 +3,35 @@
 #include "controls.h"
 
 int main() {
-    direction_t dir;
+    //direction_t dir;
+    char key;
+    init_controls();
     while(1) {
+        /*
         dir = input();
         printf("selected direction ");
         switch(dir) {
         case FORWARD:
-            printf("forward\n");
+            printf("forward");
             break;
         case BACK:
-            printf("back\n");
+            printf("back");
             break;
         case LEFT:
-            printf("left\n");
+            printf("left");
             break;
         case RIGHT:
-            printf("right\n");
+            printf("right");
             break;
         case STOP:
-            printf("stop!\n");
+            printf("stop!");
             return 0;
         default:
-            printf("none\n");
+            printf("none");
         }
+        printf("(%i,%c)\n",dir,dir);
+        */
+        key = getch();
+        printf("got %c char! (%i)\n",key,key);
     }
 }

@@ -3,6 +3,8 @@
 
 #include "controls.h"
 
+void init_controls() {}
+
 /* https://stackoverflow.com/questions/7469139/what-is-equivalent-to-getch-getche-in-linux */
 struct termios old, new;
 
