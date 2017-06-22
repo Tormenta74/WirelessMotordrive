@@ -1,13 +1,18 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "controls.h"
+#include "timing.h"
 
 int main() {
-    //direction_t dir;
-    char key;
+
+    char *the_time_is = time_str();
+    printf("Program starting at %s\n",the_time_is);
+    free(the_time_is);
+
+    direction_t dir;
     init_controls();
     while(1) {
-        /*
         dir = input();
         printf("selected direction ");
         switch(dir) {
@@ -24,14 +29,12 @@ int main() {
             printf("right");
             break;
         case STOP:
-            printf("stop!");
+            printf("stop!\n");
             return 0;
         default:
             printf("none");
         }
-        printf("(%i,%c)\n",dir,dir);
-        */
-        key = getch();
-        printf("got %c char! (%i)\n",key,key);
+        printf("\n");
     }
+    return 1;
 }
