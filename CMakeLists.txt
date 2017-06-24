@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(console C)
+project(console CXX)
 
 if(EXISTS /usr/include/xbee.h)
 
@@ -10,9 +10,9 @@ if(EXISTS /usr/include/xbee.h)
 
         message(STATUS "libxbee.so found")
 
-        file(GLOB SRC "src/*.c")
+        file(GLOB SRC "src/*.cpp")
 
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -lxbee -lpthread -lrt")
 
         include_directories(include /usr/include)
