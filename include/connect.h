@@ -6,7 +6,7 @@
 
 void setup();
 int connect(char *port);
-int send(char *msg);
+int send(char *msg, int length);
 char *receive();
 
 #endif

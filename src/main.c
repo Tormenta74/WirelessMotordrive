@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "controls.h"
 #include "timing.h"
+#include "controls.h"
 
 int main() {
 
