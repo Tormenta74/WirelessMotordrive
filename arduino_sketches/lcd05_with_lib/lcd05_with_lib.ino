@@ -1,6 +1,8 @@
 #include <lcd05.h>
 #include <Wire.h>
 
+#define LCD05_I2C_ADDRESS byte((0xC6)>>1)
+
 bool backlight=false;
 
 void setup()

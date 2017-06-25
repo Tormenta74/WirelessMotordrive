@@ -11,7 +11,7 @@
  */
 
 #include <Arduino.h>
-#include "/usr/share/arduino/libraries/Wire/Wire.h"
+#include <Wire.h>   // this forces the sketch to include Wire.h
 #include "lcd05.h"
 
 inline void write_command(byte command)

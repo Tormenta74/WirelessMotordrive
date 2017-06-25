@@ -21,6 +21,8 @@
 #include <XBee.h>
 #include <lcd05.h>
 
+#define LCD05_I2C_ADDRESS byte((0xC6)>>1)
+
 XBee xbee = XBee();
 XBeeResponse response = XBeeResponse();
 // create reusable response objects for responses we expect to handle 

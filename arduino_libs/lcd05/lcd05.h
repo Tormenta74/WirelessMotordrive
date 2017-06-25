@@ -10,7 +10,6 @@
 
 #include <Arduino.h>
 
-#define LCD05_I2C_ADDRESS byte((0xC6)>>1)
 #define LCD05_I2C_INIT_DELAY 100 // in milliseconds
 
 // LCD05's command related definitions
