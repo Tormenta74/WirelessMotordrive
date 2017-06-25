@@ -96,7 +96,7 @@ void loop()
       lcd05::clear_screen(LCD05_I2C_ADDRESS);
       lcd05::ascii_chars(
           LCD05_I2C_ADDRESS,
-          (byte*)payload,
+          (char*)payload,
           min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
           );
 

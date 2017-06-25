@@ -55,7 +55,7 @@ namespace lcd05 {
   void show_blinking_cursor(byte address);
   void backlight_on(byte address);
   void backlight_off(byte address);
-  bool ascii_chars(byte address, byte* bytes, int length);
+  bool ascii_chars(byte address, char* bytes, int length);
   byte read_fifo_length(byte address);
 }
 

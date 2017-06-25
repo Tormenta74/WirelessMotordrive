@@ -31,7 +31,7 @@ void loop()
   }
   Serial.print("fifo length: "); Serial.println(fifo_length);
 
-  lcd05::ascii_chars(LCD05_I2C_ADDRESS,(byte*)("hi"),4);
+  lcd05::ascii_chars(LCD05_I2C_ADDRESS,(char*)("hi"),4);
 
   backlight=!backlight;
   if(backlight) lcd05::backlight_off(LCD05_I2C_ADDRESS);

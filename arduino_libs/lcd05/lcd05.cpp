@@ -77,7 +77,7 @@ void lcd05::backlight_off(byte address)
   Wire.endTransmission();
 }
 
-bool lcd05::ascii_chars(byte address, byte* bytes, int length)
+bool lcd05::ascii_chars(byte address, char* bytes, int length)
 {
   if(length<=0) return false;
   Wire.beginTransmission(address); // start communication with LCD 05
