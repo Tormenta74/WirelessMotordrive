@@ -4,7 +4,7 @@
 
 #define MAX_STR_LENGTH 72 // according to xbee-arduino documentation
 
-void setup();
+void setup_conn();
 int connect(char *port);
 int send(char *msg, int length);
 char *receive();
