@@ -28,27 +28,25 @@ int main(int argc, char *argv[]) {
     init_controls();
     while(1) {
         dir = input();
-        printf("selected direction ");
         switch(dir) {
         case FORWARD:
-            printf("forward");
+            send((char*)"forward",7);
             break;
         case BACK:
-            printf("back");
+            send((char*)"back",4);
             break;
         case LEFT:
-            printf("left");
+            send((char*)"left",4);
             break;
         case RIGHT:
-            printf("right");
+            send((char*)"right",5);
             break;
         case STOP:
-            printf("stop!\n");
+            send((char*)"stop!",5);
             return 0; // correct exit point
         default:
-            printf("none");
+            send((char*)"none",4);
         }
-        printf("\n");
     }
 
     return 3;
