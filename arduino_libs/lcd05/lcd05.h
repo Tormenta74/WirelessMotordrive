@@ -59,7 +59,8 @@ namespace lcd05 {
   void hide_cursor(byte address);
   void backlight_on(byte address);
   void backlight_off(byte address);
-  bool ascii_chars(byte address, char* bytes, int length);
+  bool add_special_char(byte address, char **bytes, byte pos);
+  bool ascii_chars(byte address, char *bytes, int length);
   byte read_fifo_length(byte address);
 }
 

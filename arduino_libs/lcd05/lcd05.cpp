@@ -106,6 +106,19 @@ void lcd05::backlight_off(byte address)
   Wire.endTransmission();
 }
 
+bool lcd05::add_special_char(byte address, char **bytes, byte pos)
+{
+  if(pos<128 || pos>135) return false;
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(CUSTOM_CHAR_GENERATOR);
+  Wire.write(pos);
+  for(int i=0; i<8; i++)
+    for(int j=0; j<8; j++)
+      Wire.write(bytes[i][j]);
+  Wire.endTransmission();
+  return true;
+}
+
 bool lcd05::ascii_chars(byte address, char* bytes, int length)
 {
   if(length<=0) return false;
