@@ -3,17 +3,20 @@
 
 #include "controls.h"
 
-/* https://stackoverflow.com/questions/7469139/what-is-equivalent-to-getch-getche-in-linux */
-struct termios old, new;
+void init_controls() {}
 
-/* Initialize new terminal i/o settings */
+/* https://stackoverflow.com/questions/7469139/what-is-equivalent-to-getch-getche-in-linux */
+
+struct termios old, new_;
+
+/* Initialize new_ terminal i/o settings */
 void initTermios(int echo) 
 {
   tcgetattr(0, &old); /* grab old terminal i/o settings */
-  new = old; /* make new settings same as old settings */
-  new.c_lflag &= ~ICANON; /* disable buffered i/o */
-  new.c_lflag &= echo ? ECHO : ~ECHO; /* set echo mode */
-  tcsetattr(0, TCSANOW, &new); /* use these new terminal i/o settings now */
+  new_ = old; /* make new_ settings same as old settings */
+  new_.c_lflag &= ~ICANON; /* disable buffered i/o */
+  new_.c_lflag &= echo ? ECHO : ~ECHO; /* set echo mode */
+  tcsetattr(0, TCSANOW, &new_); /* use these new_ terminal i/o settings now */
 }
 
 /* Restore old terminal i/o settings */

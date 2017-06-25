@@ -3,6 +3,7 @@
 
 typedef enum {FORWARD, BACK, LEFT, RIGHT, NONE, STOP} direction_t;
 
+void init_controls();
 direction_t input();
 
 #endif
