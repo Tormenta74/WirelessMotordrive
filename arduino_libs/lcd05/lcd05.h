@@ -48,11 +48,15 @@
 
 namespace lcd05 {
   void set_display_type(byte address, byte type);
+  void set_tab_length(byte address, byte length);
   void clear_screen(byte address);
   void cursor_home(byte address);
+  void cursor_vertical_tab(byte address);
+  void cursor_horizontal_tab(byte address);
   void set_cursor(byte address, byte pos);
   void set_cursor_coords(byte address, byte line, byte column);
   void show_blinking_cursor(byte address);
+  void hide_cursor(byte address);
   void backlight_on(byte address);
   void backlight_off(byte address);
   bool ascii_chars(byte address, char* bytes, int length);

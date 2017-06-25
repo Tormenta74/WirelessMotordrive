@@ -25,6 +25,14 @@ void lcd05::set_display_type(byte address, byte type)
   Wire.endTransmission();
 }
 
+void lcd05::set_tab_length(byte address, byte length)
+{
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(TAB_SET);
+  Wire.write(length);
+  Wire.endTransmission();
+}
+
 void lcd05::clear_screen(byte address)
 {
   Wire.beginTransmission(address); // start communication with LCD 05
@@ -36,6 +44,20 @@ void lcd05::cursor_home(byte address)
 {
   Wire.beginTransmission(address); // start communication with LCD 05
   write_command(CURSOR_HOME);
+  Wire.endTransmission();
+}
+
+void lcd05::cursor_vertical_tab(byte address)
+{
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(VERTICAL_TAB);
+  Wire.endTransmission();
+}
+
+void lcd05::cursor_horizontal_tab(byte address)
+{
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(HORIZONTAL_TAB);
   Wire.endTransmission();
 }
 
@@ -60,6 +82,13 @@ void lcd05::show_blinking_cursor(byte address)
 {
   Wire.beginTransmission(address); // start communication with LCD 05
   write_command(SHOW_BLINKING_CURSOR);
+  Wire.endTransmission();
+}
+
+void lcd05::hide_cursor(byte address)
+{
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(HIDE_CURSOR);
   Wire.endTransmission();
 }
 
