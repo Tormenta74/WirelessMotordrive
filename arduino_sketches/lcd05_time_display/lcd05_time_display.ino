@@ -44,7 +44,7 @@ void lcdPrintDigits(int digits) {
   char digitStr[3];
   lcd05::ascii_chars(LCD05_I2C_ADDRESS,":",1);
   if(digits < 10)
-    sprintf(digitStr,"%0d",digits);
+    sprintf(digitStr,"%02d",digits);
   else
     sprintf(digitStr,"%d",digits);
   lcd05::ascii_chars(LCD05_I2C_ADDRESS,digitStr,2);
@@ -76,7 +76,7 @@ void lcdDigitalClockDisplay() {
 
   lcd05::ascii_chars(LCD05_I2C_ADDRESS," ",1);
   if(day() < 10)
-    sprintf(digitStr,"%0d",day());
+    sprintf(digitStr,"%02d",day());
   else
     sprintf(digitStr,"%d",day());
 
