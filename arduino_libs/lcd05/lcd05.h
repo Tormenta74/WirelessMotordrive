@@ -13,7 +13,7 @@
 #define LCD05_I2C_INIT_DELAY 100 // in milliseconds
 
 // LCD05's command related definitions
-#define COMMAND_REGISTER byte(0x00)
+#define LCD05_COMMAND_REGISTER byte(0x00)
 #define FIFO_AVAILABLE_LENGTH_REGISTER byte(0x00)
 #define LCD_STYLE_16X2 byte(5)
 

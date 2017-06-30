@@ -15,7 +15,7 @@
 #include "lcd05.h"
 
 inline void write_command(byte command)
-{ Wire.write(COMMAND_REGISTER); Wire.write(command); }
+{ Wire.write(LCD05_COMMAND_REGISTER); Wire.write(command); }
 
 void lcd05::set_display_type(byte address, byte type)
 {
