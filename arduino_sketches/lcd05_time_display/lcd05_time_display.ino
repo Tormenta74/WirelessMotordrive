@@ -58,8 +58,11 @@ void lcdDigitalClockDisplay() {
 
   lcd05::clear_screen(LCD05_I2C_ADDRESS);
 
-  sprintf(messagerino,"%d",hour());
-  lcd05::ascii_chars(LCD05_I2C_ADDRESS,messagerino,2);
+  if(hour() < 10)
+    sprintf(digitStr,"%02d",hour());
+  else
+    sprintf(digitStr,"%d",hour());
+  lcd05::ascii_chars(LCD05_I2C_ADDRESS,digitStr,2);
 
   lcdPrintDigits(minute());
   lcdPrintDigits(second());
@@ -145,10 +148,10 @@ void setup()  {
 void loop(){
   if (Serial.available() > 1) { // wait for at least two characters
     char c = Serial.read();
-    if( c == TIME_HEADER) {
+    if(c == TIME_HEADER) {
       processSyncMessage();
     }
-    else if( c== FORMAT_HEADER) {
+    else if(c== FORMAT_HEADER) {
       processFormatMessage();
     }
   }
