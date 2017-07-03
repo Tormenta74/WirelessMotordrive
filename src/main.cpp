@@ -34,19 +34,19 @@ int main(int argc, char *argv[]) {
         dir = input();
         switch(dir) {
         case FORWARD:
-            send((char*)"forward",7);
+            send((char*)"1",1);
             break;
         case BACK:
-            send((char*)"back",4);
+            send((char*)"2",1);
             break;
         case LEFT:
-            send((char*)"left",4);
+            send((char*)"3",1);
             break;
         case RIGHT:
-            send((char*)"right",5);
+            send((char*)"4",1);
             break;
         case STOP:
-            send((char*)"stop!",5);
+            send((char*)"0",1);
             return 0; // correct exit point
         default:
             send((char*)"none",4);
