@@ -11,17 +11,25 @@
  */
 
 #include <Arduino.h>
-#include "/usr/share/arduino/libraries/Wire/Wire.h"
+#include <Wire.h>   // this forces the sketch to include Wire.h
 #include "lcd05.h"
 
 inline void write_command(byte command)
-{ Wire.write(COMMAND_REGISTER); Wire.write(command); }
+{ Wire.write(LCD05_COMMAND_REGISTER); Wire.write(command); }
 
 void lcd05::set_display_type(byte address, byte type)
 {
   Wire.beginTransmission(address); // start communication with LCD 05
   write_command(SET_DISPLAY_TYPE);
   Wire.write(type);
+  Wire.endTransmission();
+}
+
+void lcd05::set_tab_length(byte address, byte length)
+{
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(TAB_SET);
+  Wire.write(length);
   Wire.endTransmission();
 }
 
@@ -36,6 +44,20 @@ void lcd05::cursor_home(byte address)
 {
   Wire.beginTransmission(address); // start communication with LCD 05
   write_command(CURSOR_HOME);
+  Wire.endTransmission();
+}
+
+void lcd05::cursor_vertical_tab(byte address)
+{
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(VERTICAL_TAB);
+  Wire.endTransmission();
+}
+
+void lcd05::cursor_horizontal_tab(byte address)
+{
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(HORIZONTAL_TAB);
   Wire.endTransmission();
 }
 
@@ -63,6 +85,13 @@ void lcd05::show_blinking_cursor(byte address)
   Wire.endTransmission();
 }
 
+void lcd05::hide_cursor(byte address)
+{
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(HIDE_CURSOR);
+  Wire.endTransmission();
+}
+
 void lcd05::backlight_on(byte address)
 {
   Wire.beginTransmission(address); // start communication with LCD 05
@@ -77,7 +106,20 @@ void lcd05::backlight_off(byte address)
   Wire.endTransmission();
 }
 
-bool lcd05::ascii_chars(byte address, byte* bytes, int length)
+bool lcd05::add_special_char(byte address, char **bytes, byte pos)
+{
+  if(pos<128 || pos>135) return false;
+  Wire.beginTransmission(address); // start communication with LCD 05
+  write_command(CUSTOM_CHAR_GENERATOR);
+  Wire.write(pos);
+  for(int i=0; i<8; i++)
+    for(int j=0; j<8; j++)
+      Wire.write(bytes[i][j]);
+  Wire.endTransmission();
+  return true;
+}
+
+bool lcd05::ascii_chars(byte address, char* bytes, int length)
 {
   if(length<=0) return false;
   Wire.beginTransmission(address); // start communication with LCD 05

@@ -19,36 +19,38 @@ int main(int argc, char *argv[]) {
     }
 
     // timing
-    char *the_time_is = time_str();
+    char *the_time_is = time_str(), *receit;
     printf("Program starting at %s\n",the_time_is);
     send(the_time_is,MAX_TIME_STR);
+    receit = receive(); // blocking call
+    if(receit)
+        printf("Router 1 ack: %s\n",receit);
+    free(receit);
     free(the_time_is);
-
+        
     direction_t dir;
     init_controls();
     while(1) {
         dir = input();
-        printf("selected direction ");
         switch(dir) {
         case FORWARD:
-            printf("forward");
+            send((char*)"1",1);
             break;
         case BACK:
-            printf("back");
+            send((char*)"2",1);
             break;
         case LEFT:
-            printf("left");
+            send((char*)"3",1);
             break;
         case RIGHT:
-            printf("right");
+            send((char*)"4",1);
             break;
         case STOP:
-            printf("stop!\n");
+            send((char*)"0",1);
             return 0; // correct exit point
         default:
-            printf("none");
+            send((char*)"none",4);
         }
-        printf("\n");
     }
 
     return 3;

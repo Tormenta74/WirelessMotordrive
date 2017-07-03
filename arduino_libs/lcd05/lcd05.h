@@ -10,11 +10,10 @@
 
 #include <Arduino.h>
 
-#define LCD05_I2C_ADDRESS byte((0xC6)>>1)
 #define LCD05_I2C_INIT_DELAY 100 // in milliseconds
 
 // LCD05's command related definitions
-#define COMMAND_REGISTER byte(0x00)
+#define LCD05_COMMAND_REGISTER byte(0x00)
 #define FIFO_AVAILABLE_LENGTH_REGISTER byte(0x00)
 #define LCD_STYLE_16X2 byte(5)
 
@@ -49,14 +48,19 @@
 
 namespace lcd05 {
   void set_display_type(byte address, byte type);
+  void set_tab_length(byte address, byte length);
   void clear_screen(byte address);
   void cursor_home(byte address);
+  void cursor_vertical_tab(byte address);
+  void cursor_horizontal_tab(byte address);
   void set_cursor(byte address, byte pos);
   void set_cursor_coords(byte address, byte line, byte column);
   void show_blinking_cursor(byte address);
+  void hide_cursor(byte address);
   void backlight_on(byte address);
   void backlight_off(byte address);
-  bool ascii_chars(byte address, byte* bytes, int length);
+  bool add_special_char(byte address, char **bytes, byte pos);
+  bool ascii_chars(byte address, char *bytes, int length);
   byte read_fifo_length(byte address);
 }
 
