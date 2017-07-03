@@ -99,9 +99,9 @@ void lcdDigitalClockDisplay() {
 }
 
 
-void  processFormatMessage() {
+void processFormatMessage() {
   char c = Serial.read();
-  if( c == FORMAT_LONG){
+  if(c == FORMAT_LONG){
     isLongFormat = true;
     Serial.println(F("Setting long format"));
   }
