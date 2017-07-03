@@ -19,11 +19,15 @@ int main(int argc, char *argv[]) {
     }
 
     // timing
-    char *the_time_is = time_str();
+    char *the_time_is = time_str(), *receit;
     printf("Program starting at %s\n",the_time_is);
     send(the_time_is,MAX_TIME_STR);
+    receit = receive(); // blocking call
+    if(receit)
+        printf("Router 1 ack: %s\n",receit);
+    free(receit);
     free(the_time_is);
-
+        
     direction_t dir;
     init_controls();
     while(1) {

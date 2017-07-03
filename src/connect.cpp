@@ -59,9 +59,9 @@ int send(char *msg, int length) {
 
 char *receive() {
     char *msg=NULL;
-    xbee_err ret=xbee_conRx(con,&pkt,NULL);
-    if( (ret!=XBEE_ENONE) && (ret!=XBEE_ENOTEXISTS) ) {
-        fprintf(stderr,"xbee_conRx() failed (%s:%i)\n\t-> %i - %s\n",
+    xbee_err ret=xbee_conRxWait(con,&pkt,NULL);
+    if(ret!=XBEE_ENONE) {
+        fprintf(stderr,"xbee_conRxWait() failed (%s:%i)\n\t-> %i - %s\n",
                 __FILE__,__LINE__,(int)ret,xbee_errorToStr(ret));
          goto end;
     }
