@@ -17,6 +17,8 @@
  * along with XBee-Arduino.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <avr/pgmspace.h>
+
 #include <ctype.h>
 
 #include <Wire.h>
@@ -26,6 +28,71 @@
 #include <rd02.h>
 
 #define SERIAL_BAUDS 38400
+
+/*
+   const char prepare_lcd05_string[] PROGMEM = "setting up LCD05 with address 0x";
+   const char add_arrows_string[] PROGMEM = "adding special characters...";
+   const char prepare_rd02_string[] PROGMEM = "configuring RD02 with address 0x";
+   const char prepare_time_string[] PROGMEM = "configuring time (requesting UTC time)...";
+   const char done_string[] PROGMEM = "done.";
+   const char dots_string[] PROGMEM = "...";
+ */
+
+/*------------------------*/
+/*-        Timer2        -*/
+/*------------------------*/
+
+#define TIMER1_TOP (int)(0.001 * (16e6 / 64.0)) - 1 // 249
+#define TIMER1_OVF_TIME_MS 1
+#define LCD_UPDATE_CYCLE 256   // 256ms
+#define SPEED_CHECK_CYCLE 4   // 4ms
+
+// timer variables
+volatile uint64_t milliseconds = 0;
+volatile bool lcd_update_flag = false;
+volatile bool speed_check_flag = false;
+
+ISR(TIMER2_COMPA_vect) {
+  /*milliseconds++;
+    if(milliseconds & LCD_UPDATE_CYCLE == 0) {
+    lcd_update_flag = true;
+    }
+    if(milliseconds & SPEED_CHECK_CYCLE == 0) {
+    speed_check_flag = true;
+    }*/
+}
+
+ISR(TIMER2_OVF_vect) {
+  milliseconds++;
+  if(milliseconds % LCD_UPDATE_CYCLE == 0) {
+    lcd_update_flag = true;
+  }
+  if(milliseconds % SPEED_CHECK_CYCLE == 0) {
+    speed_check_flag = true;
+  }
+}
+
+void timer2_config() {
+  cli();
+
+  // Timer2 settings:
+  //   - CTC mode
+  //   - 64 prescaler
+  TCCR2A = 0x0;
+  TCCR2A |= (1<<(WGM21));
+  TCCR2A &= ~(~(1<<(WGM20)) & ~(1<<(WGM22)));
+  TCCR2A |= (1<<(COM2A1)) | (1<<(COM2B1));
+
+  TCCR2B &= ~(~(1<<(CS20)) & ~(1<<(CS21)));
+  TCCR2B |= (1<<(CS22));
+
+  OCR2A = TIMER1_TOP;
+  TCNT2 = 0;
+  TIMSK2 |= (1<<(TOIE2));
+
+  sei();
+}
+
 
 /*----------------------*/
 /*-        Xbee        -*/
@@ -96,7 +163,7 @@ const char DLA_BYTES[CHAR_LINES] = {
   0b10000000, 0b10000000, 0b10000001, 0b10010010, 0b10010100, 0b10011000, 0b10011110, 0b10000000
 };
 
-char holder[SPECIAL_CHARS_NUM+2] = {
+char direction_chars[SPECIAL_CHARS_NUM+2] = {
   LUP_ARROW_CHAR_POS, UP_ARROW_CHAR_POS, RUP_ARROW_CHAR_POS, 0b01111110, RDOWN_ARROW_CHAR_POS, DOWN_ARROW_CHAR_POS, LDOWN_ARROW_CHAR_POS, 0b01111111
 };
 
@@ -189,52 +256,53 @@ void bottom_right_corner(char *msg, int length) {
 /*------------------------*/
 /*-         RD02         -*/
 /*------------------------*/
-#define RD02_I2C_ADDRESS  byte((0xB0)>>1)
+#define RD02_I2C_ADDRESS      byte((0xB0)>>1)
+#define DUMMY_STRAIGHT_SPEED  32
+#define DUMMY_TURN_SPEED      24
 
 int drive_mode = 0;
 
-/*------------------------*/
-/*-        Timer2        -*/
-/*------------------------*/
-#define TIMER1_TOP (int)(0.001 * (16e6 / 64.0)) - 1 // 249
-#define TIMER1_OVF_TIME_MS 1
-#define MILLISECONDS_IN_SECOND 1000
+int32_t prev_enc1=0, prev_enc2=0;
+int32_t enc1=0, enc2=0;
 
-// timer variables
-volatile uint64_t milliseconds = 0;
-volatile bool update_flag = false;
-
-ISR(TIMER2_OVF_vect) {
-  milliseconds++;
-  if(milliseconds % MILLISECONDS_IN_SECOND == 0) {
-    update_flag = true;
+void dummy_control(int direction) {
+  Serial.println("dummy mode");
+  switch(direction) {
+  case 1:
+    rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
+    rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
+    break;
+  case 2:
+    rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
+    rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
+    break;
+  case 3:
+    rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
+    rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
+    break;
+  case 4:
+    rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
+    rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
+    break;
+  default:
+    rd02::set_speed1(RD02_I2C_ADDRESS,0);
+    rd02::set_speed2(RD02_I2C_ADDRESS,0);
   }
 }
 
-void timer2_config() {
-  cli();
-
-  // Timer2 settings:
-  //   - CTC mode
-  //   - 64 prescaler
-  TCCR2A = 0x0;
-  TCCR2A |= (1<<(WGM21));
-  TCCR2A &= ~(~(1<<(WGM20)) & ~(1<<(WGM22)));
-
-  TCCR2B &= ~(~(1<<(CS20)) & ~(1<<(CS21)));
-  TCCR2B |= (1<<(CS22));
-
-  OCR2A = TIMER1_TOP;
-  TCNT2 = 0;
-  TIMSK2 |= (1<<(TOIE2));
-
-  sei();
+void regulate_speed() {
+  if(speed_check_flag) {
+    // get new encoder values
+    // compare with previous
+    // divide by time (4ms)
+  }
 }
 
 /*----------------------*/
 /*-        Time        -*/
 /*----------------------*/
 #define START_YEAR            1970
+#define DATE_MSG_LENGTH       5
 
 const int dt_SHORT_STR_LEN = 3;
 
@@ -249,18 +317,6 @@ const int dt_SHORT_STR_LEN = 3;
 static boolean isLongFormat = true;
 const unsigned long DEFAULT_TIME = 1498932320; // sat jul 1 18:05:45 UTC 2017
 
-void processFormatMessage() {
-  char c = Serial.read();
-  if(c == FORMAT_LONG){
-    isLongFormat = true;
-    Serial.println(F("Setting long format"));
-  }
-  else if(c == FORMAT_SHORT) {
-    isLongFormat = false;
-    Serial.println(F("Setting short format"));
-  }
-}
-
 void processSyncMessage(unsigned long pctime) {
   if(pctime >= DEFAULT_TIME) {
     setTime(pctime); // Sync Arduino clock to the time received on the serial port
@@ -271,8 +327,6 @@ time_t requestSync() {
   Serial.write(TIME_REQUEST);
   return 0; // the time will be sent later in response to serial mesg
 }
-
-
 
 /*------------------------*/
 /*-        SKETCH        -*/
@@ -290,66 +344,76 @@ void setup()
   delay(LCD05_I2C_INIT_DELAY);
 
   // hardware configs
-  Serial.print("setting up LCD05 with address 0x");
+  Serial.print(F("setting up LCD05 with address 0x"));
   Serial.print(LCD05_I2C_ADDRESS<<1,HEX);
-  Serial.println("...");
+  Serial.println(F("..."));
   lcd05::set_display_type(LCD05_I2C_ADDRESS,LCD_STYLE_16X2);
   lcd05::clear_screen(LCD05_I2C_ADDRESS);
   lcd05::cursor_home(LCD05_I2C_ADDRESS);
   lcd05::hide_cursor(LCD05_I2C_ADDRESS);
   lcd05::backlight_on(LCD05_I2C_ADDRESS);
-  Serial.println("done.");
+  Serial.println(F("done."));
 
-  Serial.print("adding special characters...");
+  Serial.print(F("adding special characters..."));
   add_arrow_chars();
   lcd05::clear_screen(LCD05_I2C_ADDRESS);
-  Serial.println("done.");
+  Serial.println(F("done."));
 
-  Serial.print("configuring RD02 with address 0x");
+  Serial.print(F("configuring RD02 with address 0x"));
   Serial.print(RD02_I2C_ADDRESS<<1,HEX);
-  Serial.println("...");
+  Serial.println(F("..."));
   rd02::reset_encoders(RD02_I2C_ADDRESS);
   //rd02::disable_speed_regulation(RD02_I2C_ADDRESS);
   rd02::set_mode(RD02_I2C_ADDRESS, 1);
   rd02::set_speed1(RD02_I2C_ADDRESS, 0);
   rd02::set_speed2(RD02_I2C_ADDRESS, 0);
-  Serial.println("done.");
+  Serial.println(F("done."));
 
   // start function: request time
-  Serial.print("configuring time (requesting UTC time)...");
+  Serial.print(F("configuring time (requesting UTC time)..."));
   setSyncProvider(requestSync);  //set function to call when sync required
+  //setTime(DEFAULT_TIME);
+  top_left_corner((char*)" start console",14);
 }
 
-// continuously reads packets, looking for ZB Receive or Modem Status
-void loop() 
-{    
-  int i;
+char direction_buffer[1];
 
-  switch(drive_mode) {
-  case 1:
-    rd02::set_speed1(RD02_I2C_ADDRESS,32);
-    rd02::set_speed2(RD02_I2C_ADDRESS,32);
-    break;
-  case 2:
-    rd02::set_speed1(RD02_I2C_ADDRESS,-32);
-    rd02::set_speed2(RD02_I2C_ADDRESS,-32);
-    break;
-  case 3:
-    rd02::set_speed1(RD02_I2C_ADDRESS,16);
-    rd02::set_speed2(RD02_I2C_ADDRESS,-16);
-    break;
-  case 4:
-    rd02::set_speed1(RD02_I2C_ADDRESS,-16);
-    rd02::set_speed2(RD02_I2C_ADDRESS,16);
-    break;
-  default:
-    rd02::set_speed1(RD02_I2C_ADDRESS,0);
-    rd02::set_speed2(RD02_I2C_ADDRESS,0);
+// continuously reads packets, looking for ZB Receive or Modem Status
+void loop()
+{
+  char date_buffer[DATE_MSG_LENGTH];
+
+  if(timeStatus() == timeSet) {
+    // regulate motor speed
+    switch(drive_mode) {
+    case 0:
+    case 1:   /*               */
+    case 2:   /*  dummy modes  */
+    case 3:   /*               */
+    case 4:   /*               */
+      dummy_control(drive_mode);
+      break;
+    default:  /* over 4 indicates non dummy mode */
+      regulate_speed();
+    }
+
+    // update liquid crystal display
+    if(lcd_update_flag) {
+      lcd05::clear_screen(LCD05_I2C_ADDRESS);
+
+      // ...
+      top_right_corner(direction_buffer,1);
+
+      sprintf(date_buffer,"%02d:%02d",hour(),minute());
+      bottom_right_corner(date_buffer,DATE_MSG_LENGTH);
+      lcd_update_flag = false;
+    }
   }
 
+  // listen to the network
   xbee.readPacket();
 
-  if (xbee.getResponse().isAvailable()) 
+  if(xbee.getResponse().isAvailable()) 
   { // got something
 
     switch(xbee.getResponse().getApiId())
@@ -357,7 +421,57 @@ void loop()
     case ZB_RX_RESPONSE:
 
       xbee.getResponse().getZBRxResponse(rx);
-      Serial.println("--> data received:");
+
+      // get data in manageable format
+      memcpy(
+          payload,
+          rx.getData(),
+          min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
+          );
+
+      // verify it is epoch
+      if(rx.getDataLength() > 1 && isdigit(*((char*)payload))) { // dereferencing the first mem address
+        processSyncMessage(atol((char*)payload));
+      }
+
+      // sending the echo back
+      // echo is equivalent to acknowledged in console application
+      tx=ZBTxRequest(
+          rx.getRemoteAddress64(),
+          payload,
+          min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
+          );
+      xbee.send(tx);       
+
+      // switch mode
+      // normal mode: process possible commands
+
+      // dummy mode: process arrow commands
+      if(isdigit(*((char*)payload))) {
+        switch(*((char*)payload)) {
+        case '1':
+          drive_mode = 1;
+          direction_buffer[0] = direction_chars[UP];
+          break;
+        case '2':
+          drive_mode = 2;
+          direction_buffer[0] = direction_chars[DOWN];
+          break;
+        case '3':
+          drive_mode = 3;
+          direction_buffer[0] = direction_chars[LEFT];
+          break;
+        case '4':
+          drive_mode = 4;
+          direction_buffer[0] = direction_chars[RIGHT];
+          break;
+        default:
+          drive_mode = 0;
+        }
+      }
+
+
+      // rx log
       Serial.print("----> remote address: 0x");
       Serial.print(rx.getRemoteAddress64().getMsb(),HEX);
       Serial.print(",0x");
@@ -369,64 +483,10 @@ void loop()
           (rx.getOption()==ZB_PACKET_ACKNOWLEDGED)? "yes": "no"
           );
 
-      memcpy(
-          payload,
-          rx.getData(),
-          min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
-          );
-
-      Serial.print("----> data: \"");
-      for(i=0; i<min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength()); i++) 
-        Serial.print(char(payload[i]));
-      Serial.println("\"");
-
-      // sending the echo back
-      tx=ZBTxRequest(
-          rx.getRemoteAddress64(),
-          payload,
-          min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
-          );
-      xbee.send(tx);       
-
-      lcd05::clear_screen(LCD05_I2C_ADDRESS);
-      /*
-         lcd05::ascii_chars(
-         LCD05_I2C_ADDRESS,
-         (char*)payload,
-         min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
-         );
-       */
-
-      char holder[1], tmp[1];
-      tmp[0] = payload[0];
-      if(isdigit(tmp[0])) {
-        drive_mode = atoi(tmp);
-        Serial.println();
-        Serial.println(drive_mode);
-        switch(tmp[0]) {
-        case '1':
-          top_right_corner(holder,1);
-          break;
-        case '2':
-          holder[0] = DOWN_ARROW_CHAR_POS;
-          top_right_corner(holder,1);
-          break;
-        case '3':
-          holder[0] = LUP_ARROW_CHAR_POS;
-          top_right_corner(holder,1);
-          break;
-        case '4':
-          holder[0] = RDOWN_ARROW_CHAR_POS;
-          top_right_corner(holder,1);
-          break;
-        default:
-          drive_mode = 0;
-        }
-      }
-
 
       break;
 
+      // xbee special cases
     case MODEM_STATUS_RESPONSE:
       xbee.getResponse().getModemStatusResponse(msr);
       // the local XBee sends this response on certain events, like association/dissociation
@@ -465,3 +525,147 @@ void loop()
     }
   }
 }
+
+/*
+
+// continuously reads packets, looking for ZB Receive or Modem Status
+void loop() 
+{    
+int i;
+
+switch(drive_mode) {
+case 1:
+rd02::set_speed1(RD02_I2C_ADDRESS,32);
+rd02::set_speed2(RD02_I2C_ADDRESS,32);
+break;
+case 2:
+rd02::set_speed1(RD02_I2C_ADDRESS,-32);
+rd02::set_speed2(RD02_I2C_ADDRESS,-32);
+break;
+case 3:
+rd02::set_speed1(RD02_I2C_ADDRESS,16);
+rd02::set_speed2(RD02_I2C_ADDRESS,-16);
+break;
+case 4:
+rd02::set_speed1(RD02_I2C_ADDRESS,-16);
+rd02::set_speed2(RD02_I2C_ADDRESS,16);
+break;
+default:
+rd02::set_speed1(RD02_I2C_ADDRESS,0);
+rd02::set_speed2(RD02_I2C_ADDRESS,0);
+}
+
+xbee.readPacket();
+
+if (xbee.getResponse().isAvailable()) 
+{ // got something
+
+switch(xbee.getResponse().getApiId())
+{
+case ZB_RX_RESPONSE:
+
+xbee.getResponse().getZBRxResponse(rx);
+Serial.println("--> data received:");
+Serial.print("----> remote address: 0x");
+Serial.print(rx.getRemoteAddress64().getMsb(),HEX);
+Serial.print(",0x");
+Serial.println(rx.getRemoteAddress64().getLsb(),HEX);
+Serial.print("----> lenght: ");
+Serial.println(rx.getDataLength());
+Serial.print("----> acknowledged: ");
+Serial.println(
+(rx.getOption()==ZB_PACKET_ACKNOWLEDGED)? "yes": "no"
+);
+
+memcpy(
+payload,
+rx.getData(),
+min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
+);
+
+Serial.print("----> data: \"");
+for(i=0; i<min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength()); i++) 
+Serial.print(char(payload[i]));
+Serial.println("\"");
+
+// sending the echo back
+tx=ZBTxRequest(
+rx.getRemoteAddress64(),
+payload,
+min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
+);
+xbee.send(tx);       
+
+lcd05::clear_screen(LCD05_I2C_ADDRESS);
+lcd05::ascii_chars(
+    LCD05_I2C_ADDRESS,
+    (char*)payload,
+    min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
+    );
+
+  char tmp[1];
+  tmp[0] = payload[0];
+  if(isdigit(tmp[0])) {
+    drive_mode = atoi(tmp);
+    Serial.println();
+    Serial.println(drive_mode);
+    switch(tmp[0]) {
+    case '1':
+      top_right_corner(direction_chars+UP,1);
+      break;
+    case '2':
+      top_right_corner(direction_chars+DOWN,1);
+      break;
+    case '3':
+      top_right_corner(direction_chars+LEFT,1);
+      break;
+    case '4':
+      top_right_corner(direction_chars+RIGTH,1);
+      break;
+    default:
+      drive_mode = 0;
+    }
+  }
+
+
+break;
+
+case MODEM_STATUS_RESPONSE:
+xbee.getResponse().getModemStatusResponse(msr);
+// the local XBee sends this response on certain events, like association/dissociation
+
+Serial.print("--> modem status received (0x");
+Serial.print(msr.getStatus(),HEX);
+Serial.println("):");
+if(msr.getStatus()==ASSOCIATED) Serial.println("----> associated");
+else if (msr.getStatus()==DISASSOCIATED) Serial.println("----> disassociated");
+else Serial.println("----> other status ");
+break;
+
+case ZB_TX_STATUS_RESPONSE:
+xbee.getResponse().getZBTxStatusResponse(txStatus);
+Serial.print("--> tx status received (0x");
+Serial.print(txStatus.getDeliveryStatus(),HEX);
+Serial.print("): ");
+Serial.println(
+    (txStatus.getDeliveryStatus()==SUCCESS)? "delivered": "not delivered"
+    );
+break;
+
+default:
+Serial.print("--> something received (0x");
+Serial.print(xbee.getResponse().getApiId(),HEX);
+Serial.println(")");
+}
+} 
+else
+{ 
+  if (xbee.getResponse().isError()) 
+  {
+    Serial.print("--> error reading packet, errror code: 0x");  
+    Serial.print(xbee.getResponse().getErrorCode(),HEX);
+    Serial.println(")");
+  }
+}
+}
+*/

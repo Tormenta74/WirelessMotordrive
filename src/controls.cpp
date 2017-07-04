@@ -51,10 +51,12 @@ direction_t input() {
     case 's':
     case 'S':
         return BACK;
+    case ' ':
+        return STOP;
     case 'q':
     case 'Q':
-        return STOP;
+        return QUIT;
     default:
-        return NONE;
+        return STOP;
     }
 }

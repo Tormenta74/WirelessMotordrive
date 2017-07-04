@@ -47,6 +47,9 @@ int main(int argc, char *argv[]) {
             break;
         case STOP:
             send((char*)"0",1);
+            break;
+        case QUIT:
+            send((char*)"0",1);
             return 0; // correct exit point
         default:
             send((char*)"none",4);
