@@ -29,15 +29,6 @@
 
 #define SERIAL_BAUDS 38400
 
-/*
-   const char prepare_lcd05_string[] PROGMEM = "setting up LCD05 with address 0x";
-   const char add_arrows_string[] PROGMEM = "adding special characters...";
-   const char prepare_rd02_string[] PROGMEM = "configuring RD02 with address 0x";
-   const char prepare_time_string[] PROGMEM = "configuring time (requesting UTC time)...";
-   const char done_string[] PROGMEM = "done.";
-   const char dots_string[] PROGMEM = "...";
- */
-
 /*------------------------*/
 /*-        Timer2        -*/
 /*------------------------*/
@@ -52,15 +43,15 @@ volatile uint64_t milliseconds = 0;
 volatile bool lcd_update_flag = false;
 volatile bool speed_check_flag = false;
 
-ISR(TIMER2_COMPA_vect) {
-  /*milliseconds++;
-    if(milliseconds & LCD_UPDATE_CYCLE == 0) {
-    lcd_update_flag = true;
-    }
-    if(milliseconds & SPEED_CHECK_CYCLE == 0) {
-    speed_check_flag = true;
-    }*/
-}
+/*ISR(TIMER2_COMPA_vect) {
+  milliseconds++;
+  if(milliseconds & LCD_UPDATE_CYCLE == 0) {
+  lcd_update_flag = true;
+  }
+  if(milliseconds & SPEED_CHECK_CYCLE == 0) {
+  speed_check_flag = true;
+  }
+  }*/
 
 ISR(TIMER2_OVF_vect) {
   milliseconds++;
@@ -131,6 +122,7 @@ uint8_t payload[MAX_ZB_PAYLOAD_LENGTH];
 #define DOWN                  5
 #define LEFT_DOWN             6
 #define LEFT                  7
+#define STOP                  8
 
 #define SPECIAL_CHARS_NUM     6
 
@@ -163,8 +155,8 @@ const char DLA_BYTES[CHAR_LINES] = {
   0b10000000, 0b10000000, 0b10000001, 0b10010010, 0b10010100, 0b10011000, 0b10011110, 0b10000000
 };
 
-char direction_chars[SPECIAL_CHARS_NUM+2] = {
-  LUP_ARROW_CHAR_POS, UP_ARROW_CHAR_POS, RUP_ARROW_CHAR_POS, 0b01111110, RDOWN_ARROW_CHAR_POS, DOWN_ARROW_CHAR_POS, LDOWN_ARROW_CHAR_POS, 0b01111111
+char direction_chars[SPECIAL_CHARS_NUM+3] = {
+  LUP_ARROW_CHAR_POS, UP_ARROW_CHAR_POS, RUP_ARROW_CHAR_POS, 0b01111110, RDOWN_ARROW_CHAR_POS, DOWN_ARROW_CHAR_POS, LDOWN_ARROW_CHAR_POS, 0b01111111, 0b11011011
 };
 
 void fifo_wait() {
@@ -265,38 +257,44 @@ int drive_mode = 0;
 int32_t prev_enc1=0, prev_enc2=0;
 int32_t enc1=0, enc2=0;
 
-void dummy_control(int direction) {
-  Serial.println("dummy mode");
-  switch(direction) {
-  case 1:
-    rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
-    rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
-    break;
-  case 2:
-    rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
-    rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
-    break;
-  case 3:
-    rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
-    rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
-    break;
-  case 4:
-    rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
-    rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
-    break;
-  default:
-    rd02::set_speed1(RD02_I2C_ADDRESS,0);
-    rd02::set_speed2(RD02_I2C_ADDRESS,0);
+// this is real m/s times 100
+int speed_ms = 0;
+
+void regulate_speed() {
+  // get new encoder values
+  // compare with previous
+  // divide by time (4ms)
+}
+
+void motor_control() {
+  if(speed_check_flag) {
+    switch(drive_mode) {
+    case 0:
+      rd02::set_speed1(RD02_I2C_ADDRESS,0);
+      rd02::set_speed2(RD02_I2C_ADDRESS,0);
+      break;
+    case 1:
+      rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
+      rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
+      break;
+    case 2:
+      rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
+      rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
+      break;
+    case 3:
+      rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
+      rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
+      break;
+    case 4:
+      rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
+      rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
+      break;
+    default:
+      regulate_speed();
+    }
   }
 }
 
-void regulate_speed() {
-  if(speed_check_flag) {
-    // get new encoder values
-    // compare with previous
-    // divide by time (4ms)
-  }
-}
 
 /*----------------------*/
 /*-        Time        -*/
@@ -384,31 +382,22 @@ void loop()
   char date_buffer[DATE_MSG_LENGTH];
 
   if(timeStatus() == timeSet) {
-    // regulate motor speed
-    switch(drive_mode) {
-    case 0:
-    case 1:   /*               */
-    case 2:   /*  dummy modes  */
-    case 3:   /*               */
-    case 4:   /*               */
-      dummy_control(drive_mode);
-      break;
-    default:  /* over 4 indicates non dummy mode */
-      regulate_speed();
-    }
+    motor_control();
 
     // update liquid crystal display
     if(lcd_update_flag) {
       lcd05::clear_screen(LCD05_I2C_ADDRESS);
 
       // ...
-      top_right_corner(direction_buffer,1);
+      if(drive_mode <= 4)
+        top_right_corner(direction_buffer,1);
 
       sprintf(date_buffer,"%02d:%02d",hour(),minute());
       bottom_right_corner(date_buffer,DATE_MSG_LENGTH);
       lcd_update_flag = false;
     }
   }
+
 
   // listen to the network
   xbee.readPacket();
@@ -466,6 +455,7 @@ void loop()
           direction_buffer[0] = direction_chars[RIGHT];
           break;
         default:
+          direction_buffer[0] = direction_chars[STOP];
           drive_mode = 0;
         }
       }
@@ -525,147 +515,3 @@ void loop()
     }
   }
 }
-
-/*
-
-// continuously reads packets, looking for ZB Receive or Modem Status
-void loop() 
-{    
-int i;
-
-switch(drive_mode) {
-case 1:
-rd02::set_speed1(RD02_I2C_ADDRESS,32);
-rd02::set_speed2(RD02_I2C_ADDRESS,32);
-break;
-case 2:
-rd02::set_speed1(RD02_I2C_ADDRESS,-32);
-rd02::set_speed2(RD02_I2C_ADDRESS,-32);
-break;
-case 3:
-rd02::set_speed1(RD02_I2C_ADDRESS,16);
-rd02::set_speed2(RD02_I2C_ADDRESS,-16);
-break;
-case 4:
-rd02::set_speed1(RD02_I2C_ADDRESS,-16);
-rd02::set_speed2(RD02_I2C_ADDRESS,16);
-break;
-default:
-rd02::set_speed1(RD02_I2C_ADDRESS,0);
-rd02::set_speed2(RD02_I2C_ADDRESS,0);
-}
-
-xbee.readPacket();
-
-if (xbee.getResponse().isAvailable()) 
-{ // got something
-
-switch(xbee.getResponse().getApiId())
-{
-case ZB_RX_RESPONSE:
-
-xbee.getResponse().getZBRxResponse(rx);
-Serial.println("--> data received:");
-Serial.print("----> remote address: 0x");
-Serial.print(rx.getRemoteAddress64().getMsb(),HEX);
-Serial.print(",0x");
-Serial.println(rx.getRemoteAddress64().getLsb(),HEX);
-Serial.print("----> lenght: ");
-Serial.println(rx.getDataLength());
-Serial.print("----> acknowledged: ");
-Serial.println(
-(rx.getOption()==ZB_PACKET_ACKNOWLEDGED)? "yes": "no"
-);
-
-memcpy(
-payload,
-rx.getData(),
-min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
-);
-
-Serial.print("----> data: \"");
-for(i=0; i<min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength()); i++) 
-Serial.print(char(payload[i]));
-Serial.println("\"");
-
-// sending the echo back
-tx=ZBTxRequest(
-rx.getRemoteAddress64(),
-payload,
-min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
-);
-xbee.send(tx);       
-
-lcd05::clear_screen(LCD05_I2C_ADDRESS);
-lcd05::ascii_chars(
-    LCD05_I2C_ADDRESS,
-    (char*)payload,
-    min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
-    );
-
-  char tmp[1];
-  tmp[0] = payload[0];
-  if(isdigit(tmp[0])) {
-    drive_mode = atoi(tmp);
-    Serial.println();
-    Serial.println(drive_mode);
-    switch(tmp[0]) {
-    case '1':
-      top_right_corner(direction_chars+UP,1);
-      break;
-    case '2':
-      top_right_corner(direction_chars+DOWN,1);
-      break;
-    case '3':
-      top_right_corner(direction_chars+LEFT,1);
-      break;
-    case '4':
-      top_right_corner(direction_chars+RIGTH,1);
-      break;
-    default:
-      drive_mode = 0;
-    }
-  }
-
-
-break;
-
-case MODEM_STATUS_RESPONSE:
-xbee.getResponse().getModemStatusResponse(msr);
-// the local XBee sends this response on certain events, like association/dissociation
-
-Serial.print("--> modem status received (0x");
-Serial.print(msr.getStatus(),HEX);
-Serial.println("):");
-if(msr.getStatus()==ASSOCIATED) Serial.println("----> associated");
-else if (msr.getStatus()==DISASSOCIATED) Serial.println("----> disassociated");
-else Serial.println("----> other status ");
-break;
-
-case ZB_TX_STATUS_RESPONSE:
-xbee.getResponse().getZBTxStatusResponse(txStatus);
-Serial.print("--> tx status received (0x");
-Serial.print(txStatus.getDeliveryStatus(),HEX);
-Serial.print("): ");
-Serial.println(
-    (txStatus.getDeliveryStatus()==SUCCESS)? "delivered": "not delivered"
-    );
-break;
-
-default:
-Serial.print("--> something received (0x");
-Serial.print(xbee.getResponse().getApiId(),HEX);
-Serial.println(")");
-}
-} 
-else
-{ 
-  if (xbee.getResponse().isError()) 
-  {
-    Serial.print("--> error reading packet, errror code: 0x");  
-    Serial.print(xbee.getResponse().getErrorCode(),HEX);
-    Serial.println(")");
-  }
-}
-}
-*/

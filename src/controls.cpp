@@ -3,8 +3,6 @@
 
 #include "controls.h"
 
-void init_controls() {}
-
 /* https://stackoverflow.com/questions/7469139/what-is-equivalent-to-getch-getche-in-linux */
 
 struct termios old, new_;
@@ -35,24 +33,28 @@ char getch()
   return ch;
 }
 
-direction_t input() {
+direction_t input()
+{
     char key = getch();
 
     switch(key) {
-    case 'a':
-    case 'A':
-        return LEFT;
-    case 'd':
-    case 'D':
-        return RIGHT;
     case 'w':
     case 'W':
         return FORWARD;
     case 's':
     case 'S':
         return BACK;
+    case 'd':
+    case 'D':
+        return RIGHT;
+    case 'a':
+    case 'A':
+        return LEFT;
     case ' ':
         return STOP;
+    case 'm':
+    case 'M':
+        return TOGGLE;
     case 'q':
     case 'Q':
         return QUIT;

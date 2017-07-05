@@ -13,6 +13,7 @@ if(EXISTS /usr/include/xbee.h)
         file(GLOB SRC "src/*.cpp")
 
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -lxbee -lpthread -lrt")
 
         include_directories(include /usr/include)
