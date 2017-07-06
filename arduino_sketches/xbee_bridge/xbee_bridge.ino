@@ -90,7 +90,7 @@ void timer2_config() {
 /*----------------------*/
 XBee xbee = XBee();
 XBeeResponse response = XBeeResponse();
-// create reusable response objects for responses we expect to handle 
+// create reusable response objects for responses we expect to handle
 ZBRxResponse rx = ZBRxResponse();
 ModemStatusResponse msr = ModemStatusResponse();
 ZBTxRequest tx=ZBTxRequest();
@@ -249,20 +249,58 @@ void bottom_right_corner(char *msg, int length) {
 /*-         RD02         -*/
 /*------------------------*/
 #define RD02_I2C_ADDRESS      byte((0xB0)>>1)
-#define DUMMY_STRAIGHT_SPEED  32
+//#define DUMMY_STRAIGHT_SPEED  32
+#define DUMMY_STRAIGHT_SPEED  7
 #define DUMMY_TURN_SPEED      24
+
+#define WHEEL_DIAMETRE_MM     1000
+
+const int32_t CORRIDOR_LENGTH = 0x7FFFFFFF;
 
 int drive_mode = 0;
 
 int32_t prev_enc1=0, prev_enc2=0;
 int32_t enc1=0, enc2=0;
 
-// this is real m/s times 100
-int speed_ms = 0;
+// measure is in mm/s
+int target_speed_mms=0, real_speed_mms=0;
+
+// question: how does an encoder delta relate to
+// the linear speed of the motor?
+//
+// say delta is N ticks. N ticks corresponds directly
+// to N degrees the wheel has rotated. let's also assume
+// N > 0, which means that the wheel is spinning clockwise,
+// as proven by simple observations in test programs.
+// the delta was calculated by measuring the encoder in
+// a constant time interval, so we can calculate the angular
+// speed, which we can directly convert to linear speed
+
+int instant_velocity(int32_t delta) {
+  // delta is in degrees: convert to radians
+
+  return 0;
+}
 
 void regulate_speed() {
+  int32_t delta1=0, delta2=0;
+
+  prev_enc1 = enc1;
+  prev_enc2 = enc2;
+
   // get new encoder values
+  enc1 = rd02::read_enc1(RD02_I2C_ADDRESS);
+  enc2 = rd02::read_enc2(RD02_I2C_ADDRESS);
+
   // compare with previous
+  delta1 = enc1 - prev_enc1;
+  delta2 = enc2 - prev_enc2;
+
+  delta1 = (abs(delta1) < abs(CORRIDOR_LENGTH - (delta1)))
+    ? delta1 : CORRIDOR_LENGTH - (delta1);
+  delta2 = (abs(delta2) < abs(CORRIDOR_LENGTH - (delta2)))
+    ? delta2 : CORRIDOR_LENGTH - (delta2);
+
   // divide by time (4ms)
 }
 
@@ -312,7 +350,6 @@ const int dt_SHORT_STR_LEN = 3;
 
 #define TIME_REQUEST  7     // ASCII bell character requests a time sync message
 
-static boolean isLongFormat = true;
 const unsigned long DEFAULT_TIME = 1498932320; // sat jul 1 18:05:45 UTC 2017
 
 void processSyncMessage(unsigned long pctime) {
@@ -330,11 +367,11 @@ time_t requestSync() {
 /*-        SKETCH        -*/
 /*------------------------*/
 
-void setup() 
+void setup()
 {
   // start services
   Serial.begin(SERIAL_BAUDS);
-  xbee.begin(Serial); 
+  xbee.begin(Serial);
   Wire.begin();
   timer2_config();
 
@@ -366,6 +403,8 @@ void setup()
   rd02::set_speed1(RD02_I2C_ADDRESS, 0);
   rd02::set_speed2(RD02_I2C_ADDRESS, 0);
   Serial.println(F("done."));
+  Serial.print(F("Corridor length: 0x")); Serial.println(CORRIDOR_LENGTH,HEX);
+  Serial.print(F("Corridor length: ")); Serial.println(CORRIDOR_LENGTH,DEC);
 
   // start function: request time
   Serial.print(F("configuring time (requesting UTC time)..."));
@@ -381,7 +420,7 @@ void loop()
 {
   char date_buffer[DATE_MSG_LENGTH];
 
-  if(timeStatus() == timeSet) {
+  if(!(timeStatus() != timeSet)) {
     motor_control();
 
     // update liquid crystal display
@@ -402,7 +441,7 @@ void loop()
   // listen to the network
   xbee.readPacket();
 
-  if(xbee.getResponse().isAvailable()) 
+  if(xbee.getResponse().isAvailable())
   { // got something
 
     switch(xbee.getResponse().getApiId())
@@ -430,7 +469,7 @@ void loop()
           payload,
           min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
           );
-      xbee.send(tx);       
+      xbee.send(tx);
 
       // switch mode
       // normal mode: process possible commands
@@ -504,12 +543,12 @@ void loop()
       Serial.print(xbee.getResponse().getApiId(),HEX);
       Serial.println(")");
     }
-  } 
+  }
   else
-  { 
-    if (xbee.getResponse().isError()) 
+  {
+    if (xbee.getResponse().isError())
     {
-      Serial.print("--> error reading packet, errror code: 0x");  
+      Serial.print("--> error reading packet, errror code: 0x");
       Serial.print(xbee.getResponse().getErrorCode(),HEX);
       Serial.println(")");
     }
