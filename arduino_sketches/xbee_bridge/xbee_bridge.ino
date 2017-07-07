@@ -17,9 +17,13 @@
  * along with XBee-Arduino.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define __STDC_LIMIT_MACROS
+
 #include <avr/pgmspace.h>
 
 #include <ctype.h>
+#include <limits.h>
+#include <stdint.h>
 
 #include <Wire.h>
 #include <XBee.h>
@@ -36,7 +40,7 @@
 #define TIMER1_TOP (int)(0.001 * (16e6 / 64.0)) - 1 // 249
 #define TIMER1_OVF_TIME_MS 1
 #define LCD_UPDATE_CYCLE 256   // 256ms
-#define SPEED_CHECK_CYCLE 4   // 4ms
+#define SPEED_CHECK_CYCLE 4    // 4ms 
 
 // timer variables
 volatile uint64_t milliseconds = 0;
@@ -249,21 +253,26 @@ void bottom_right_corner(char *msg, int length) {
 /*-         RD02         -*/
 /*------------------------*/
 #define RD02_I2C_ADDRESS      byte((0xB0)>>1)
-//#define DUMMY_STRAIGHT_SPEED  32
-#define DUMMY_STRAIGHT_SPEED  7
+#define DUMMY_STRAIGHT_SPEED  32
 #define DUMMY_TURN_SPEED      24
 
-#define WHEEL_DIAMETRE_MM     1000
+#define PREV                  0
+#define CURR                  1
 
-const int32_t CORRIDOR_LENGTH = 0x7FFFFFFF;
+#define WHEEL_DIAMETRE_MM     100
+#define WHEEL_DIAMETRE        0.1
+
+const int64_t CORRIDOR_LENGTH = INT32_MAX - INT32_MIN;
 
 int drive_mode = 0;
+int commanded_speed = 0;
 
-int32_t prev_enc1=0, prev_enc2=0;
-int32_t enc1=0, enc2=0;
+int32_t enc1[2]={0}, enc2[2]={0};
 
 // measure is in mm/s
-int target_speed_mms=0, real_speed_mms=0;
+int target_speed1_mms=0, real_speed1_mms=0, target_speed2_mms=0, real_speed2_mms=0;
+// measure in deltas per measuring
+int64_t target_speed1_dpm=0, real_speed1_dpm=0, target_speed2_dpm=0, real_speed2_dpm=0;
 
 // question: how does an encoder delta relate to
 // the linear speed of the motor?
@@ -282,26 +291,35 @@ int instant_velocity(int32_t delta) {
   return 0;
 }
 
-void regulate_speed() {
-  int32_t delta1=0, delta2=0;
+int32_t dpm_of_commanded_speed() {
+  // v = w*r => w = v/r
+  int32_t w = (float)commanded_speed/(float)WHEEL_DIAMETRE_MM;
+}
 
-  prev_enc1 = enc1;
-  prev_enc2 = enc2;
+void regulate_speed() {
+  int64_t delta1=0, delta2=0;
 
   // get new encoder values
-  enc1 = rd02::read_enc1(RD02_I2C_ADDRESS);
-  enc2 = rd02::read_enc2(RD02_I2C_ADDRESS);
-
+  enc1[CURR] = rd02::read_enc1(RD02_I2C_ADDRESS);
   // compare with previous
-  delta1 = enc1 - prev_enc1;
-  delta2 = enc2 - prev_enc2;
+  delta1 = enc1[CURR] - enc1[PREV];
+  real_speed1_dpm = delta1 = (abs(delta1) < CORRIDOR_LENGTH -  abs(delta1))
+    ? delta1 : CORRIDOR_LENGTH - (delta1); // esto, CON EL SIGNO DE DELTA
 
-  delta1 = (abs(delta1) < abs(CORRIDOR_LENGTH - (delta1)))
-    ? delta1 : CORRIDOR_LENGTH - (delta1);
-  delta2 = (abs(delta2) < abs(CORRIDOR_LENGTH - (delta2)))
+  // repeat for encoder 2
+  enc2[CURR] = rd02::read_enc2(RD02_I2C_ADDRESS);
+  delta2 = enc2[CURR] - enc2[PREV];
+  real_speed2_dpm = delta2 = (abs(delta2) < abs(CORRIDOR_LENGTH - (delta2)))
     ? delta2 : CORRIDOR_LENGTH - (delta2);
 
-  // divide by time (4ms)
+
+  // compare with target
+
+  // divide by time (4ms) (needed?)
+
+  // store encoder values for future measurement
+  enc1[PREV] = enc1[CURR];
+  enc2[PREV] = enc2[CURR];
 }
 
 void motor_control() {
@@ -328,9 +346,12 @@ void motor_control() {
       rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
       break;
     default:
+      //rd02::set_speed1(RD02_I2C_ADDRESS,drive_mode);
+      //rd02::set_speed2(RD02_I2C_ADDRESS,drive_mode);
       regulate_speed();
     }
   }
+  speed_check_flag = false;
 }
 
 
@@ -350,12 +371,11 @@ const int dt_SHORT_STR_LEN = 3;
 
 #define TIME_REQUEST  7     // ASCII bell character requests a time sync message
 
-const unsigned long DEFAULT_TIME = 1498932320; // sat jul 1 18:05:45 UTC 2017
+const unsigned long DEFAULT_TIME = 1499425843; // fri jul  7 11:11:03 UTC 2017
 
-void processSyncMessage(unsigned long pctime) {
-  if(pctime >= DEFAULT_TIME) {
-    setTime(pctime); // Sync Arduino clock to the time received on the serial port
-  }
+void processSyncMessage(time_t pctime) {
+  setTime(pctime);
+  Serial.print("Time set! "); Serial.println(pctime,DEC);
 }
 
 time_t requestSync() {
@@ -398,13 +418,17 @@ void setup()
   Serial.print(RD02_I2C_ADDRESS<<1,HEX);
   Serial.println(F("..."));
   rd02::reset_encoders(RD02_I2C_ADDRESS);
+  enc1[PREV] = rd02::read_enc1(RD02_I2C_ADDRESS);
+  enc2[PREV] = rd02::read_enc2(RD02_I2C_ADDRESS);
   //rd02::disable_speed_regulation(RD02_I2C_ADDRESS);
   rd02::set_mode(RD02_I2C_ADDRESS, 1);
   rd02::set_speed1(RD02_I2C_ADDRESS, 0);
   rd02::set_speed2(RD02_I2C_ADDRESS, 0);
   Serial.println(F("done."));
-  Serial.print(F("Corridor length: 0x")); Serial.println(CORRIDOR_LENGTH,HEX);
-  Serial.print(F("Corridor length: ")); Serial.println(CORRIDOR_LENGTH,DEC);
+  
+  Serial.print(F("INT32_MAX = ")); Serial.println(INT32_MAX,DEC);
+  Serial.print(F("INT32_MIN = ")); Serial.println(INT32_MIN,DEC);
+  Serial.print(F("INT32_MAX - INT32_MIN = ")); Serial.println(CORRIDOR_LENGTH,DEC);
 
   // start function: request time
   Serial.print(F("configuring time (requesting UTC time)..."));
@@ -418,7 +442,7 @@ char direction_buffer[1];
 // continuously reads packets, looking for ZB Receive or Modem Status
 void loop()
 {
-  char date_buffer[DATE_MSG_LENGTH];
+  char lcd_buffer[MAX_LCD_MESSAGE];
 
   if(!(timeStatus() != timeSet)) {
     motor_control();
@@ -428,11 +452,24 @@ void loop()
       lcd05::clear_screen(LCD05_I2C_ADDRESS);
 
       // ...
-      if(drive_mode <= 4)
-        top_right_corner(direction_buffer,1);
+      if(drive_mode > 4) {
+        //sprintf(lcd_buffer,"%lu",real_speed1_dpm);
+        //top_left_corner(lcd_buffer,MAX_LCD_MESSAGE);
+        //Serial.print("delta1 = "); Serial.println(lcd_buffer);
 
-      sprintf(date_buffer,"%02d:%02d",hour(),minute());
-      bottom_right_corner(date_buffer,DATE_MSG_LENGTH);
+        Serial.print("encoder 1 = "); Serial.println(enc1[CURR],DEC);
+        Serial.print("previous 1 = "); Serial.println(enc1[PREV],DEC);
+        Serial.print("calculated delta 1 = "); Serial.println(real_speed1_dpm,DEC);
+
+        //sprintf(lcd_buffer,"%lu",real_speed2_dpm);
+        //bottom_left_corner(lcd_buffer,MAX_LCD_MESSAGE);
+        //Serial.print("delta2 = "); Serial.println(lcd_buffer);
+      }
+
+      top_right_corner(direction_buffer,1);
+
+      sprintf(lcd_buffer,"%02d:%02d",hour(),minute());
+      bottom_right_corner(lcd_buffer,DATE_MSG_LENGTH);
       lcd_update_flag = false;
     }
   }
@@ -458,8 +495,9 @@ void loop()
           );
 
       // verify it is epoch
-      if(rx.getDataLength() > 1 && isdigit(*((char*)payload))) { // dereferencing the first mem address
-        processSyncMessage(atol((char*)payload));
+      if(*(char*)payload == 'T') {
+        time_t time = atol((char*)payload+1);
+        processSyncMessage(time);
       }
 
       // sending the echo back
@@ -497,6 +535,10 @@ void loop()
           direction_buffer[0] = direction_chars[STOP];
           drive_mode = 0;
         }
+      } else if(*(char*)payload == 'S') {
+        direction_buffer[0] = 'N';
+        commanded_speed = atoi((char*)(payload+1));
+        drive_mode = 5;
       }
 
 

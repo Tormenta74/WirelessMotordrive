@@ -10,6 +10,25 @@
 #include "commands.h"
 #include "timing.h"
 
+void print_normal_mode_help() {
+    printf("Type one of the following commands to interact with the robot:\n");
+    printf("\tspeed <n>: sets the robot motor drive speed register to n (n must be between -128 and 127)\n");
+    printf("\t[nyi]encoder <n>: fetches the latest encoder n value (n must be 1 or 2)\n");
+    printf("\ttoggle: changes the controls to \"dummy\" mode\n");
+    printf("\tquit: exits the program (sending a stop signal to the robot)\n");
+}
+
+void print_dummy_mode_help() {
+    printf("Use one of the following keys to interact with the robot:\n");
+    printf("\tw,W: forward\n");
+    printf("\ta,A: turn left\n");
+    printf("\ts,S: backwards\n");
+    printf("\td,D: turn right\n");
+    printf("\tm,M: switch to normal mode\n");
+    printf("\tq,Q: exits the program (sending a stop signal to the robot)\n");
+    printf("\t<space>: stop\n");
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -34,9 +53,11 @@ int main(int argc, char *argv[])
     free(receit);
     free(the_time_is);
 
+
     bool normal_mode = false;
+    print_dummy_mode_help();
     direction_t dir;
-    char cmd_msg[5];
+    char cmd_msg[6];
     while(1) {
         if(normal_mode) {
             std::string command;
@@ -47,18 +68,19 @@ int main(int argc, char *argv[])
             switch(code) {
             case SPEED:
                 //printf("speed command!\n");
-                if(data < 100 || data > 2000) {
-                    printf("speed must be between [100-2000]\n");
+                if(data < 1 || data > 127) {
+                    printf("speed must be between [1-127]\n");
                 }
-                sprintf(cmd_msg,"%d",data);
+                sprintf(cmd_msg,"S%d",data);
                 send(cmd_msg,4);
                 break;
             case ENC:
-                printf("encoder command!\n");
+                //printf("encoder command!\n");
                 break;
             case DUMMY:
-                printf("Switching to dummy mode\n");
                 normal_mode = false;
+                printf("\nSwitching to dummy mode\n");
+                print_dummy_mode_help();
                 break;
             case END:
                 send((char*)"0",1);
@@ -88,7 +110,8 @@ int main(int argc, char *argv[])
                 break;
             case TOGGLE:
                 normal_mode = true;
-                printf("Switching to normal mode\n");
+                printf("\nSwitching to normal mode\n");
+                print_normal_mode_help();
                 break;
             case QUIT:
                 send((char*)"0",1);

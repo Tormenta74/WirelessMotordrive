@@ -7,8 +7,8 @@
 
 char *time_str() {
     time_t now = time(NULL);
-    char *string = (char*)malloc(MAX_TIME_STR+1);
-    if(sprintf(string,"%lu",now) < 1) {
+    char *string = (char*)malloc(MAX_TIME_STR+2);
+    if(sprintf(string,"T%lu",now) < 1) {
         return NULL;
     }
     return string;
