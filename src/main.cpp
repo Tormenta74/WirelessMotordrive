@@ -1,3 +1,22 @@
+/* main.cpp
+ * Author: Diego Sáinz de Medrano <diego.sainzdemedrano@gmail.com>
+ *
+ * This file is part of the Wireless Motordrive project.                   
+ * Copyright (C) 2017 Diego Sáinz de Medrano.
+
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation.
+
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, visit https://www.gnu.org/licenses/ to get
+ * a copy.
+ */
 
 #include <iostream>
 #include <string>
@@ -10,7 +29,8 @@
 #include "commands.h"
 #include "timing.h"
 
-void print_normal_mode_help() {
+void print_normal_mode_help()
+{
     printf("Type one of the following commands to interact with the robot:\n");
     printf("\tspeed <n>: sets the robot motor drive speed register to n (n must be between -128 and 127)\n");
     printf("\t[nyi]encoder <n>: fetches the latest encoder n value (n must be 1 or 2)\n");
@@ -18,7 +38,8 @@ void print_normal_mode_help() {
     printf("\tquit: exits the program (sending a stop signal to the robot)\n");
 }
 
-void print_dummy_mode_help() {
+void print_dummy_mode_help()
+{
     printf("Use one of the following keys to interact with the robot:\n");
     printf("\tw,W: forward\n");
     printf("\ta,A: turn left\n");
@@ -52,7 +73,6 @@ int main(int argc, char *argv[])
         printf("Router 1 ack: %s\n",receit);
     free(receit);
     free(the_time_is);
-
 
     bool normal_mode = false;
     print_dummy_mode_help();
@@ -89,7 +109,6 @@ int main(int argc, char *argv[])
                 std::cerr << '"' << command << '"'
                     << " command not recognized" << std::endl;
             }
-
         } else {
             dir = input();
             switch(dir) {

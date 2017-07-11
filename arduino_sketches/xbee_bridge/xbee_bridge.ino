@@ -46,17 +46,8 @@ volatile uint64_t milliseconds = 0;
 volatile bool lcd_update_flag = false;
 volatile bool speed_check_flag = false;
 
-/*ISR(TIMER2_COMPA_vect) {
-  milliseconds++;
-  if(milliseconds & LCD_UPDATE_CYCLE == 0) {
-  lcd_update_flag = true;
-  }
-  if(milliseconds & SPEED_CHECK_CYCLE == 0) {
-  speed_check_flag = true;
-  }
-  }*/
-
-ISR(TIMER2_OVF_vect) {
+ISR(TIMER2_OVF_vect)
+{
   milliseconds++;
   if(milliseconds % LCD_UPDATE_CYCLE == 0) {
     lcd_update_flag = true;
@@ -66,7 +57,8 @@ ISR(TIMER2_OVF_vect) {
   }
 }
 
-void timer2_config() {
+void timer2_config()
+{
   cli();
 
   // Timer2 settings:
@@ -162,12 +154,14 @@ const char direction_chars[SPECIAL_CHARS_NUM+3] = {
   LUP_ARROW_CHAR_POS, UP_ARROW_CHAR_POS, RUP_ARROW_CHAR_POS, 0b01111110, RDOWN_ARROW_CHAR_POS, DOWN_ARROW_CHAR_POS, LDOWN_ARROW_CHAR_POS, 0b01111111, 0b11011011
 };
 
-void fifo_wait() {
+void fifo_wait()
+{
   while(lcd05::read_fifo_length(LCD05_I2C_ADDRESS)<4);
 }
 
 // adds up, down and diagonal arrows
-void add_arrow_chars() {
+void add_arrow_chars()
+{
   // reserving 8x8 bit matrix
   char *bytes_array[CHAR_LINES];
   for(int i=0; i<CHAR_LINES; i++)
@@ -219,21 +213,24 @@ void add_arrow_chars() {
     if(bytes_array[i]) free(bytes_array[i]);
 }
 
-void top_left_corner(char *msg, int length) {
+void top_left_corner(char *msg, int length)
+{
   fifo_wait();
 
   lcd05::cursor_home(LCD05_I2C_ADDRESS);
   lcd05::ascii_chars(LCD05_I2C_ADDRESS, msg, length);
 }
 
-void top_right_corner(char *msg, int length) {
+void top_right_corner(char *msg, int length)
+{
   fifo_wait();
 
   lcd05::set_cursor(LCD05_I2C_ADDRESS, LCD_LINE_LENGTH - length + 1);
   lcd05::ascii_chars(LCD05_I2C_ADDRESS, msg, length);
 }
 
-void bottom_left_corner(char *msg, int length) {
+void bottom_left_corner(char *msg, int length)
+{
   fifo_wait();
 
   lcd05::cursor_home(LCD05_I2C_ADDRESS);
@@ -241,7 +238,8 @@ void bottom_left_corner(char *msg, int length) {
   lcd05::ascii_chars(LCD05_I2C_ADDRESS, msg, length);
 }
 
-void bottom_right_corner(char *msg, int length) {
+void bottom_right_corner(char *msg, int length)
+{
   fifo_wait();
 
   lcd05::set_cursor(LCD05_I2C_ADDRESS, 2*LCD_LINE_LENGTH - length + 1);
@@ -255,7 +253,7 @@ void bottom_right_corner(char *msg, int length) {
 #define DUMMY_STRAIGHT_SPEED  32
 #define DUMMY_TURN_SPEED      24
 #define MAX_SPEED             63
-#define SPEED_CONTROL_INC     2
+#define SPEED_CONTROL_STEP    2
 
 #define PREV                  0
 #define CURR                  1
@@ -266,11 +264,12 @@ void bottom_right_corner(char *msg, int length) {
 const int64_t CORRIDOR_LENGTH = INT32_MAX - INT32_MIN;
 
 int drive_mode = 0;
+// commanded speed is in mm/s
 int commanded_speed = 0;
 
 int8_t speed_code1=0, speed_code2=0;
 int32_t enc1[2]={0}, enc2[2]={0};
-unsigned long times1[2]={0}, times2[2]={0};
+unsigned long time1[2]={0}, time2[2]={0};
 
 // question: how does an encoder delta relate to
 // the linear speed of the motor?
@@ -291,82 +290,95 @@ unsigned long times1[2]={0}, times2[2]={0};
 
 const double ADVANCE_PER_TICK_MM = (double)WHEEL_DIAMETRE_MM*M_PI/(double)360;
 
-// delta is in encoder ticks, last_measurement in ms
-// returns in mm/ms (or m/s)
-double instant_speed(int64_t tick_delta, unsigned long time_delta) {
-  return (double)(tick_delta*ADVANCE_PER_TICK_MM)/(double)time_delta;
-}
-
-// so what we can take from this is: we want to be advancing a very concrete
-// amount of ticks between every measurement. we derive this 
-// amount same as above
-
-inline int64_t dpm_of_commanded_speed(unsigned long time_delta) {
-  return (int)((float)(commanded_speed*time_delta)/ADVANCE_PER_TICK_MM);
-}
-
-void regulate_speed() {
+void regulate_speed()
+{
   int64_t delta1=0, delta2=0, delta_comparison=0;
+  int target_delta=0;
 
-  times1[CURR] = milliseconds;
-  // get new encoder values
+  // register time
+  time1[CURR] = milliseconds;
+
+  // get new encoder value
   enc1[CURR] = rd02::read_enc1(RD02_I2C_ADDRESS);
+
   // compare with previous
   delta1 = enc1[CURR] - enc1[PREV];
-  delta1 = (abs(delta1) < CORRIDOR_LENGTH -  abs(delta1))
-    ? delta1 : CORRIDOR_LENGTH - (delta1); // esto, CON EL SIGNO DE DELTA (???)
+  if(abs(delta1) > CORRIDOR_LENGTH - abs(delta1)) {
+    if(delta1 < 0)
+      delta1 = -1 * (CORRIDOR_LENGTH - abs(delta1));
+    else
+      delta1 = CORRIDOR_LENGTH - abs(delta1);
+  } // else case is default
 
-  times2[CURR] = milliseconds;
+  // compare with target
+  target_delta = (int)round(
+      ((double)commanded_speed/1000.0
+       * (time1[CURR] - time2[PREV]))
+      / ADVANCE_PER_TICK_MM
+      );
+
+  /* Explanation:
+  // commanded_speed translated to mm/ms (or m/s)
+  double c_speed_mmms = (double)commanded_speed/1000.0;
+  // distance in mm: speed in mm/ms * time in ms
+  double distance_mm = c_speed_mmms * (time1[CURR] - time2[PREV]);
+  // number of real ticks corresponding to such distance
+  double num_ticks = distance_mm / ADVANCE_PER_TICK_MM;
+  // rounding
+  int aprox_num_ticks = (int)round(aprox_num_ticks);
+   */
+
+  // --------------------
   // repeat for encoder 2
+  time2[CURR] = milliseconds;
   enc2[CURR] = rd02::read_enc2(RD02_I2C_ADDRESS);
   delta2 = enc2[CURR] - enc2[PREV];
   delta2 = (abs(delta2) < abs(CORRIDOR_LENGTH - (delta2)))
     ? delta2 : CORRIDOR_LENGTH - (delta2);
+  if(abs(delta2) > CORRIDOR_LENGTH - abs(delta2)) {
+    if(delta2 < 0)
+      delta2 = -1 * (CORRIDOR_LENGTH - abs(delta2));
+    else
+      delta2 = CORRIDOR_LENGTH - abs(delta2);
+  } // else case is default
 
-  // compare with target
 
-  delta_comparison = dpm_of_commanded_speed(times1[CURR] - times1[PREV]) - delta1;
-  if(delta_comparison < SPEED_CONTROL_INC) {
-    speed_code1 += SPEED_CONTROL_INC;
-  } else {
-
-  }
-
-  // divide by time (4ms) (needed?)
+  // so: we moved N ticks in a given period of time. we were supposed to move 
+  // a determined number of ticks, so let's compare the difference
+  //delta_comparison = dpm_of_commanded_speed(times1[CURR] - times1[PREV]) - delta1;
 
   // store encoder values for future measurement
-  enc1[PREV] = enc1[CURR]; times1[PREV] = times1[CURR];
-  enc2[PREV] = enc2[CURR]; times2[PREV] = times2[CURR];
+  enc1[PREV] = enc1[CURR]; time1[PREV] = time1[CURR];
+  enc2[PREV] = enc2[CURR]; time2[PREV] = time2[CURR];
 }
 
-void motor_control() {
-  if(speed_check_flag) {
-    switch(drive_mode) {
-    case 0:
-      rd02::set_speed1(RD02_I2C_ADDRESS,0);
-      rd02::set_speed2(RD02_I2C_ADDRESS,0);
-      break;
-    case 1:
-      rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
-      rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
-      break;
-    case 2:
-      rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
-      rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
-      break;
-    case 3:
-      rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
-      rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
-      break;
-    case 4:
-      rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
-      rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
-      break;
-    default:
-      //rd02::set_speed1(RD02_I2C_ADDRESS,drive_mode);
-      //rd02::set_speed2(RD02_I2C_ADDRESS,drive_mode);
-      regulate_speed();
-    }
+void motor_control()
+{
+  switch(drive_mode) {
+  case 0:
+    rd02::set_speed1(RD02_I2C_ADDRESS,0);
+    rd02::set_speed2(RD02_I2C_ADDRESS,0);
+    break;
+  case 1:
+    rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
+    rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
+    break;
+  case 2:
+    rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
+    rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
+    break;
+  case 3:
+    rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
+    rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
+    break;
+  case 4:
+    rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
+    rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
+    break;
+  default:
+    //rd02::set_speed1(RD02_I2C_ADDRESS,drive_mode);
+    //rd02::set_speed2(RD02_I2C_ADDRESS,drive_mode);
+    regulate_speed();
   }
   speed_check_flag = false;
 }
@@ -390,7 +402,8 @@ const int dt_SHORT_STR_LEN = 3;
 
 const unsigned long DEFAULT_TIME = 1499425843; // fri jul  7 11:11:03 UTC 2017
 
-void processSyncMessage(time_t pctime) {
+void processSyncMessage(time_t pctime)
+{
   setTime(pctime);
   Serial.print("Time set! "); Serial.println(pctime,DEC);
 }
@@ -436,12 +449,6 @@ void setup()
   enc1[PREV] = rd02::read_enc1(RD02_I2C_ADDRESS);
   enc2[PREV] = rd02::read_enc2(RD02_I2C_ADDRESS);
   Serial.println(F("done."));
-  
-  Serial.print("ADVANCE_PER_TICK_MM = "); Serial.println(ADVANCE_PER_TICK_MM,5);
-  Serial.print(" instant_speed("); Serial.print(125); Serial.print(","); Serial.print(16);
-  Serial.print(") = "); Serial.println(instant_speed(125,16));
-  Serial.print(" dpm_of_commanded_speed("); Serial.print(16);
-  Serial.print(") = "); Serial.println((unsigned long)dpm_of_commanded_speed(4));
 
   // start function: request time
   Serial.print(F("configuring time (requesting UTC time)..."));
@@ -456,18 +463,20 @@ void loop()
   char lcd_buffer[MAX_LCD_MESSAGE];
 
   if(!(timeStatus() != timeSet)) {
-    motor_control();
+    if(speed_check_flag) {
+      motor_control();
+    }
 
     // update liquid crystal display
     if(lcd_update_flag) {
       lcd05::clear_screen(LCD05_I2C_ADDRESS);
 
       // top left
-      sprintf(lcd_buffer,"M1:%.02fm/s",dpm_of_commanded_speed(16));
-      top_left_corner(lcd_buffer,strlen(lcd_buffer));
+      //sprintf(lcd_buffer,"M1:% 2.1fm/s",dpm_of_commanded_speed(16));
+      //top_left_corner(lcd_buffer,strlen(lcd_buffer));
 
       // bottom left
-      //sprintf(lcd_buffer,"M2:%.2fm/s",);
+      //sprintf(lcd_buffer,"M2:% 2.1fm/s",dpm_of_commanded_speed(16));
       //bottom_left_corner(lcd_buffer,strlen(lcd_buffer));
 
       // top right
@@ -551,17 +560,17 @@ void loop()
 
       // rx log
       /*
-      Serial.print("----> remote address: 0x");
-      Serial.print(rx.getRemoteAddress64().getMsb(),HEX);
-      Serial.print(",0x");
-      Serial.println(rx.getRemoteAddress64().getLsb(),HEX);
-      Serial.print("----> lenght: ");
-      Serial.println(rx.getDataLength());
-      Serial.print("----> acknowledged: ");
-      Serial.println(
-          (rx.getOption()==ZB_PACKET_ACKNOWLEDGED)? "yes": "no"
-          );
-      */
+         Serial.print("----> remote address: 0x");
+         Serial.print(rx.getRemoteAddress64().getMsb(),HEX);
+         Serial.print(",0x");
+         Serial.println(rx.getRemoteAddress64().getLsb(),HEX);
+         Serial.print("----> lenght: ");
+         Serial.println(rx.getDataLength());
+         Serial.print("----> acknowledged: ");
+         Serial.println(
+         (rx.getOption()==ZB_PACKET_ACKNOWLEDGED)? "yes": "no"
+         );
+       */
 
       break;
 
@@ -570,34 +579,34 @@ void loop()
       xbee.getResponse().getModemStatusResponse(msr);
       // the local XBee sends this response on certain events, like association/dissociation
 
-/*
-      Serial.print("--> modem status received (0x");
-      Serial.print(msr.getStatus(),HEX);
-      Serial.println("):");
-      if(msr.getStatus()==ASSOCIATED) Serial.println("----> associated");
-      else if (msr.getStatus()==DISASSOCIATED) Serial.println("----> disassociated");
-      else Serial.println("----> other status ");
-*/
+      /*
+         Serial.print("--> modem status received (0x");
+         Serial.print(msr.getStatus(),HEX);
+         Serial.println("):");
+         if(msr.getStatus()==ASSOCIATED) Serial.println("----> associated");
+         else if (msr.getStatus()==DISASSOCIATED) Serial.println("----> disassociated");
+         else Serial.println("----> other status ");
+       */
       break;
 
     case ZB_TX_STATUS_RESPONSE:
       xbee.getResponse().getZBTxStatusResponse(txStatus);
-/*
-      Serial.print("--> tx status received (0x");
-      Serial.print(txStatus.getDeliveryStatus(),HEX);
-      Serial.print("): ");
-      Serial.println(
-          (txStatus.getDeliveryStatus()==SUCCESS)? "delivered": "not delivered"
-          );
-*/
+      /*
+         Serial.print("--> tx status received (0x");
+         Serial.print(txStatus.getDeliveryStatus(),HEX);
+         Serial.print("): ");
+         Serial.println(
+         (txStatus.getDeliveryStatus()==SUCCESS)? "delivered": "not delivered"
+         );
+       */
       break;
 
     default:;
-/*
-      Serial.print("--> something received (0x");
-      Serial.print(xbee.getResponse().getApiId(),HEX);
-      Serial.println(")");
-*/
+            /*
+               Serial.print("--> something received (0x");
+               Serial.print(xbee.getResponse().getApiId(),HEX);
+               Serial.println(")");
+             */
     }
   }
   else

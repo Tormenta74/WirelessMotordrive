@@ -1,0 +1,61 @@
+--------------------------------------
+DELTA PROBLEM
+
+say CL = 13
+
+get delta:
+  
+  time1 = now
+
+  case |----e1-|-e2----| 
+
+    delta = e2 - e1 -> [2]
+    delta_c = CL - abs(delta) -> 11
+
+    forwards 2, no ovf
+
+
+  case |----e2-|-e1----| 
+
+    delta = e2 - e1 -> [-2]
+    delta_c = CL - abs(delta) -> 11
+
+    backwards -2, no ovf
+
+
+  case |-e2----|----e1-| 
+
+    delta = e2 - e1 -> 8
+    delta_c = CL - abs(delta) -> [3]
+
+    forwards 3, ovf
+
+
+  case |-e1----|----e2-| 
+
+    delta = e2 - e1 -> -8
+    delta_c = CL - abs(delta) -> [3]
+
+    backwards -3, ovf
+
+get velocity:
+
+  velocity = (delta) / (time1 - time2)
+
+--------------------------------------
+COMMANDED SPEED TICKS IN GIVEN TIME PROBLEM
+
+commanded speed is in mm per s
+to translate to mm per ms:
+    mm     1s      x
+  x -- * ------ = ---- mm/ms
+    s    1000ms   1000
+
+so now commanded speed is in mm per ms
+
+  distance in mm = speed in mm per ms * time in ms
+
+--------------------------------------
+CURRENT SPEED PROBLEM
+
+we move a number of ticks, stored in delta
