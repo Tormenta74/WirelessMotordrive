@@ -38,7 +38,7 @@
 
 #define TIMER1_TOP (int)(0.001 * (16e6 / 64.0)) - 1 // 249
 #define TIMER1_OVF_TIME_MS 1
-#define LCD_UPDATE_CYCLE 512   // 512ms
+#define LCD_UPDATE_CYCLE 256   // 256ms
 #define SPEED_CHECK_CYCLE 16   // 16ms 
 
 // timer variables
@@ -92,7 +92,6 @@ ZBTxRequest tx=ZBTxRequest();
 ZBTxStatusResponse txStatus = ZBTxStatusResponse();
 
 #define MAX_ZB_PAYLOAD_LENGTH 72 // according to xbee-arduino documentation
-uint8_t payload[MAX_ZB_PAYLOAD_LENGTH];
 
 /*---------------------*/
 /*-       LCD05       -*/
@@ -255,44 +254,51 @@ void bottom_right_corner(char *msg, int length)
 #define MAX_SPEED             63
 #define SPEED_CONTROL_STEP    2
 
+// buffers' positions
 #define PREV                  0
 #define CURR                  1
+
+// drive modes
+#define DUMMY                 0
+#define NORMAL                1
 
 #define WHEEL_DIAMETRE_MM     100
 #define WHEEL_DIAMETRE        0.1
 
 const int64_t CORRIDOR_LENGTH = INT32_MAX - INT32_MIN;
 
-int drive_mode = 0;
+int drive_mode = DUMMY;
 // commanded speed is in mm/s
-int commanded_speed = 0;
+double commanded_speed = 0;
+double measured_speed1=0, measured_speed2=0;
 
 int8_t speed_code1=0, speed_code2=0;
 int32_t enc1[2]={0}, enc2[2]={0};
-unsigned long time1[2]={0}, time2[2]={0};
+uint64_t time1[2]={0}, time2[2]={0};
 
 // question: how does an encoder delta relate to
 // the linear speed of the motor?
 //
 // NOTE: irrelevant paragraph
-// say delta is N ticks. N ticks corresponds directly
-// to N degrees the wheel has rotated. let's also assume
-// N > 0, which means that the wheel is spinning clockwise,
-// as proven by simple observations in test programs.
-// the delta was calculated by measuring the encoder in
-// a constant time interval, so we can calculate the angular
-// speed, which we can directly convert to linear speed
 //
-// NOTE: This is what we want
 // each tick on the encoder means one degree (in 360º) of advance
 // on the wheel. given that we know the diametre of the wheel, we
 // can calculate how much distance is traveled per tick
 
 const double ADVANCE_PER_TICK_MM = (double)WHEEL_DIAMETRE_MM*M_PI/(double)360;
+const double K = 0.01;
+
+int64_t i64abs(int64_t num)
+{
+  if(num < 0)
+    return -num;
+  return num;
+}
 
 void regulate_speed()
 {
-  int64_t delta1=0, delta2=0, delta_comparison=0;
+  int64_t delta1=0, delta2=0, delta1c=0, delta_comparison=0;
+  double speed=0.0;
   int target_delta=0;
 
   // register time
@@ -300,52 +306,56 @@ void regulate_speed()
 
   // get new encoder value
   enc1[CURR] = rd02::read_enc1(RD02_I2C_ADDRESS);
+  //Serial.print("enc[CURR] = "); Serial.println((long)enc1[CURR]);
 
   // compare with previous
   delta1 = enc1[CURR] - enc1[PREV];
-  if(abs(delta1) > CORRIDOR_LENGTH - abs(delta1)) {
+  delta1c = INT32_MAX - i64abs(delta1) - INT32_MIN;
+  // in case of overflow
+  if(i64abs(delta1) > i64abs(delta1c)) {
     if(delta1 < 0)
-      delta1 = -1 * (CORRIDOR_LENGTH - abs(delta1));
+      delta1 = delta1c;
     else
-      delta1 = CORRIDOR_LENGTH - abs(delta1);
+      delta1 = -delta1c;
   } // else case is default
 
-  // compare with target
-  target_delta = (int)round(
-      ((double)commanded_speed/1000.0
-       * (time1[CURR] - time2[PREV]))
-      / ADVANCE_PER_TICK_MM
-      );
+  // get corresponding velocity (in mm/ms)
+  measured_speed1 = static_cast<double>(delta1) * ADVANCE_PER_TICK_MM / (time1[CURR] - time1[PREV]);
 
-  /* Explanation:
-  // commanded_speed translated to mm/ms (or m/s)
-  double c_speed_mmms = (double)commanded_speed/1000.0;
-  // distance in mm: speed in mm/ms * time in ms
-  double distance_mm = c_speed_mmms * (time1[CURR] - time2[PREV]);
-  // number of real ticks corresponding to such distance
-  double num_ticks = distance_mm / ADVANCE_PER_TICK_MM;
-  // rounding
-  int aprox_num_ticks = (int)round(aprox_num_ticks);
-   */
+  // compare with target (target is in mm/s!!)
+  speed_code1 += K*(commanded_speed-measured_speed1*1000.0);
+
+  if(lcd_update_flag) {
+    //Serial.print("\nspeed (m/s) = "); Serial.println(measured_speed1,6);
+    //Serial.print("\ntarget speed (m/s) = "); Serial.println(commanded_speed/1000.0,6);
+    //Serial.print("new speed code = "); Serial.println((int)speed_code1);
+  }
+
 
   // --------------------
   // repeat for encoder 2
-  time2[CURR] = milliseconds;
-  enc2[CURR] = rd02::read_enc2(RD02_I2C_ADDRESS);
-  delta2 = enc2[CURR] - enc2[PREV];
-  delta2 = (abs(delta2) < abs(CORRIDOR_LENGTH - (delta2)))
+  /*time2[CURR] = milliseconds;
+    enc2[CURR] = rd02::read_enc2(RD02_I2C_ADDRESS);
+    delta2 = enc2[CURR] - enc2[PREV];
+    delta2 = (abs(delta2) < abs(CORRIDOR_LENGTH - (delta2)))
     ? delta2 : CORRIDOR_LENGTH - (delta2);
-  if(abs(delta2) > CORRIDOR_LENGTH - abs(delta2)) {
+    if(abs(delta2) > CORRIDOR_LENGTH - abs(delta2)) {
     if(delta2 < 0)
-      delta2 = -1 * (CORRIDOR_LENGTH - abs(delta2));
+    delta2 = -1 * (CORRIDOR_LENGTH - abs(delta2));
     else
-      delta2 = CORRIDOR_LENGTH - abs(delta2);
-  } // else case is default
-
-
-  // so: we moved N ticks in a given period of time. we were supposed to move 
-  // a determined number of ticks, so let's compare the difference
-  //delta_comparison = dpm_of_commanded_speed(times1[CURR] - times1[PREV]) - delta1;
+    delta2 = CORRIDOR_LENGTH - abs(delta2);
+    }
+    measured_speed2 = (double)delta1 * ADVANCE_PER_TICK_MM / (time2[CURR] - time2[PREV]);
+    speed = 1000.0 * measured_speed1;
+    if(speed < commanded_speed) {
+    speed_code2 += SPEED_CONTROL_STEP;
+    if(speed_code2 > MAX_SPEED)
+    speed_code2 = MAX_SPEED;
+    } else {
+    speed_code2 -= SPEED_CONTROL_STEP;
+    if(speed_code2 < -MAX_SPEED)
+    speed_code2 = -MAX_SPEED;
+    }*/
 
   // store encoder values for future measurement
   enc1[PREV] = enc1[CURR]; time1[PREV] = time1[CURR];
@@ -354,32 +364,14 @@ void regulate_speed()
 
 void motor_control()
 {
-  switch(drive_mode) {
-  case 0:
-    rd02::set_speed1(RD02_I2C_ADDRESS,0);
-    rd02::set_speed2(RD02_I2C_ADDRESS,0);
-    break;
-  case 1:
-    rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
-    rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_STRAIGHT_SPEED);
-    break;
-  case 2:
-    rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
-    rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_STRAIGHT_SPEED);
-    break;
-  case 3:
-    rd02::set_speed1(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
-    rd02::set_speed2(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
-    break;
-  case 4:
-    rd02::set_speed1(RD02_I2C_ADDRESS,-DUMMY_TURN_SPEED);
-    rd02::set_speed2(RD02_I2C_ADDRESS,DUMMY_TURN_SPEED);
-    break;
-  default:
-    //rd02::set_speed1(RD02_I2C_ADDRESS,drive_mode);
-    //rd02::set_speed2(RD02_I2C_ADDRESS,drive_mode);
-    regulate_speed();
-  }
+  // regulate speed codes
+  if(drive_mode == NORMAL) {
+    //regulate_speed();
+  } 
+  // always set speeds
+  rd02::set_speed1(RD02_I2C_ADDRESS,speed_code1);
+  rd02::set_speed2(RD02_I2C_ADDRESS,speed_code2);
+  // reset flag
   speed_check_flag = false;
 }
 
@@ -446,12 +438,15 @@ void setup()
   rd02::set_speed1(RD02_I2C_ADDRESS, 0);
   rd02::set_speed2(RD02_I2C_ADDRESS, 0);
   rd02::reset_encoders(RD02_I2C_ADDRESS);
-  enc1[PREV] = rd02::read_enc1(RD02_I2C_ADDRESS);
-  enc2[PREV] = rd02::read_enc2(RD02_I2C_ADDRESS);
+  time1[PREV] = milliseconds;
+  //enc1[PREV] = rd02::read_enc1(RD02_I2C_ADDRESS);
+  time2[PREV] = milliseconds;
+  //enc2[PREV] = rd02::read_enc2(RD02_I2C_ADDRESS);
   Serial.println(F("done."));
 
   // start function: request time
   Serial.print(F("configuring time (requesting UTC time)..."));
+
   top_left_corner((char*)" start console",14);
 }
 
@@ -461,6 +456,7 @@ char direction_buffer[1] = {direction_chars[STOP]};
 void loop()
 {
   char lcd_buffer[MAX_LCD_MESSAGE];
+  uint8_t payload[MAX_ZB_PAYLOAD_LENGTH];
 
   if(!(timeStatus() != timeSet)) {
     if(speed_check_flag) {
@@ -472,12 +468,14 @@ void loop()
       lcd05::clear_screen(LCD05_I2C_ADDRESS);
 
       // top left
-      //sprintf(lcd_buffer,"M1:% 2.1fm/s",dpm_of_commanded_speed(16));
-      //top_left_corner(lcd_buffer,strlen(lcd_buffer));
+      //sprintf(lcd_buffer,"M1:% 2.1fm/s",measured_speed1);
+      sprintf(lcd_buffer,"S1:%d",speed_code1);
+      top_left_corner(lcd_buffer,strlen(lcd_buffer));
 
       // bottom left
-      //sprintf(lcd_buffer,"M2:% 2.1fm/s",dpm_of_commanded_speed(16));
-      //bottom_left_corner(lcd_buffer,strlen(lcd_buffer));
+      //sprintf(lcd_buffer,"M2:% 2.1fm/s",measured_speed2);
+      sprintf(lcd_buffer,"S2:%d",speed_code2);
+      bottom_left_corner(lcd_buffer,strlen(lcd_buffer));
 
       // top right
       top_right_corner(direction_buffer,1);
@@ -493,12 +491,11 @@ void loop()
 
   // listen to the network
   xbee.readPacket();
+  memset(payload,0,MAX_ZB_PAYLOAD_LENGTH*sizeof(int8_t));
 
-  if(xbee.getResponse().isAvailable())
-  { // got something
+  if(xbee.getResponse().isAvailable()) { // got something
 
-    switch(xbee.getResponse().getApiId())
-    {
+    switch(xbee.getResponse().getApiId()) {
     case ZB_RX_RESPONSE:
 
       xbee.getResponse().getZBRxResponse(rx);
@@ -510,11 +507,6 @@ void loop()
           min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
           );
 
-      // verify it is epoch
-      if(*(char*)payload == 'T') {
-        time_t time = atol((char*)payload+1);
-        processSyncMessage(time);
-      }
 
       // sending the echo back
       // echo is equivalent to acknowledged in console application
@@ -529,48 +521,60 @@ void loop()
       // normal mode: process possible commands
 
       // dummy mode: process arrow commands
-      if(isdigit(*((char*)payload))) {
-        switch(*((char*)payload)) {
+      if(*(char*)payload == 'D') {
+        drive_mode = DUMMY;
+        commanded_speed = 0.0;
+        switch(*((char*)payload+1)) {
+        case '0':
+          speed_code1 = speed_code2 = 0;
+          direction_buffer[0] = direction_chars[STOP];
+          break;
         case '1':
-          drive_mode = 1;
+          speed_code1 = speed_code2 = DUMMY_STRAIGHT_SPEED;
           direction_buffer[0] = direction_chars[UP];
           break;
         case '2':
-          drive_mode = 2;
+          speed_code1 = speed_code2 = -DUMMY_STRAIGHT_SPEED;
           direction_buffer[0] = direction_chars[DOWN];
           break;
         case '3':
-          drive_mode = 3;
+          speed_code1 = DUMMY_TURN_SPEED;
+          speed_code2 = -DUMMY_TURN_SPEED;
           direction_buffer[0] = direction_chars[LEFT];
           break;
         case '4':
-          drive_mode = 4;
+          speed_code1 = -DUMMY_TURN_SPEED;
+          speed_code2 = DUMMY_TURN_SPEED;
           direction_buffer[0] = direction_chars[RIGHT];
           break;
         default:
           direction_buffer[0] = direction_chars[STOP];
-          drive_mode = 0;
         }
       } else if(*(char*)payload == 'S') {
+        drive_mode = NORMAL;
         direction_buffer[0] = 'N';
-        commanded_speed = atoi((char*)(payload+1));
-        drive_mode = 5;
+        commanded_speed = (double)atoi((char*)(payload+1));
+        Serial.print("setting speed to "); Serial.print(commanded_speed / 1000.0);
+        Serial.println("m/s");
+      } else if(*(char*)payload == 'T') {
+        time_t time = atol((char*)payload+1);
+        processSyncMessage(time);
       }
 
-
       // rx log
-      /*
-         Serial.print("----> remote address: 0x");
-         Serial.print(rx.getRemoteAddress64().getMsb(),HEX);
-         Serial.print(",0x");
-         Serial.println(rx.getRemoteAddress64().getLsb(),HEX);
-         Serial.print("----> lenght: ");
-         Serial.println(rx.getDataLength());
-         Serial.print("----> acknowledged: ");
-         Serial.println(
-         (rx.getOption()==ZB_PACKET_ACKNOWLEDGED)? "yes": "no"
-         );
-       */
+
+      Serial.print("\n----> remote address: 0x");
+      Serial.print(rx.getRemoteAddress64().getMsb(),HEX);
+      Serial.print(",0x");
+      Serial.println(rx.getRemoteAddress64().getLsb(),HEX);
+      Serial.print("----> lenght: ");
+      Serial.println(rx.getDataLength());
+      Serial.print("----> acknowledged: ");
+      Serial.println(
+          (rx.getOption()==ZB_PACKET_ACKNOWLEDGED)? "yes": "no"
+          );
+      Serial.print("----> data: ");
+      Serial.println((char*)payload);
 
       break;
 
@@ -578,44 +582,15 @@ void loop()
     case MODEM_STATUS_RESPONSE:
       xbee.getResponse().getModemStatusResponse(msr);
       // the local XBee sends this response on certain events, like association/dissociation
-
-      /*
-         Serial.print("--> modem status received (0x");
-         Serial.print(msr.getStatus(),HEX);
-         Serial.println("):");
-         if(msr.getStatus()==ASSOCIATED) Serial.println("----> associated");
-         else if (msr.getStatus()==DISASSOCIATED) Serial.println("----> disassociated");
-         else Serial.println("----> other status ");
-       */
       break;
-
     case ZB_TX_STATUS_RESPONSE:
       xbee.getResponse().getZBTxStatusResponse(txStatus);
-      /*
-         Serial.print("--> tx status received (0x");
-         Serial.print(txStatus.getDeliveryStatus(),HEX);
-         Serial.print("): ");
-         Serial.println(
-         (txStatus.getDeliveryStatus()==SUCCESS)? "delivered": "not delivered"
-         );
-       */
       break;
-
     default:;
-            /*
-               Serial.print("--> something received (0x");
-               Serial.print(xbee.getResponse().getApiId(),HEX);
-               Serial.println(")");
-             */
     }
   }
-  else
-  {
-    if (xbee.getResponse().isError())
-    {
-      Serial.print("--> error reading packet, errror code: 0x");
-      Serial.print(xbee.getResponse().getErrorCode(),HEX);
-      Serial.println(")");
+  else {
+    if (xbee.getResponse().isError()) {
     }
   }
 }

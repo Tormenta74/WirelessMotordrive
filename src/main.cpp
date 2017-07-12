@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "connect.h"
 #include "controls.h"
@@ -85,14 +86,16 @@ int main(int argc, char *argv[])
 
             int data;
             command_t code = process_cmd(command,&data);
+            printf("sending ");
             switch(code) {
             case SPEED:
                 //printf("speed command!\n");
-                if(data < 1 || data > 127) {
-                    printf("speed must be between [1-127]\n");
+                if(data < -200 || data > 200) {
+                    printf("speed must be between [-200,200]\n");
                 }
                 sprintf(cmd_msg,"S%d",data);
-                send(cmd_msg,4);
+                printf("%s\n",cmd_msg);
+                send(cmd_msg,strlen(cmd_msg));
                 break;
             case ENC:
                 //printf("encoder command!\n");
@@ -103,7 +106,8 @@ int main(int argc, char *argv[])
                 print_dummy_mode_help();
                 break;
             case END:
-                send((char*)"0",1);
+                send((char*)"D0",2);
+                printf("D0\n");
                 return 0; // correct exit point
             default:
                 std::cerr << '"' << command << '"'
@@ -113,19 +117,19 @@ int main(int argc, char *argv[])
             dir = input();
             switch(dir) {
             case FORWARD:
-                send((char*)"1",1);
+                send((char*)"D1",2);
                 break;
             case BACK:
-                send((char*)"2",1);
+                send((char*)"D2",2);
                 break;
             case LEFT:
-                send((char*)"3",1);
+                send((char*)"D3",2);
                 break;
             case RIGHT:
-                send((char*)"4",1);
+                send((char*)"D4",2);
                 break;
             case STOP:
-                send((char*)"0",1);
+                send((char*)"D0",2);
                 break;
             case TOGGLE:
                 normal_mode = true;
@@ -133,7 +137,7 @@ int main(int argc, char *argv[])
                 print_normal_mode_help();
                 break;
             case QUIT:
-                send((char*)"0",1);
+                send((char*)"D0",1);
                 return 0; // correct exit point
             default:
                 send((char*)"none",4);

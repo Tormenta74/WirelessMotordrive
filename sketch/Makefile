@@ -2,6 +2,7 @@
 BOARD_TAG         = uno
 ARDUINO_PORT	  = /dev/ttyACM0
 #ARDUINO_PORT	  = /dev/ttyACM1
+MONITOR_BAUDRATE  = 38400
 
 CXXFLAGS_STD      = -std=c++11
 
