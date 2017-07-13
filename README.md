@@ -2,11 +2,7 @@ Wireless Motordrive
 ===================
 Proyecto para la Actividad Práctica 4 de [Sistemas Empotrados y de Tiempo Real](https://www2.ulpgc.es/index.php?pagina=plan_estudio&ver=pantalla&numPantalla=99&nCodAsignatura=40840&codTitulacion=4008&codPlan=40&codEspecialidad=02), en la ULPGC.
 
-Por Diego Sáinz de Medrano.
-
-# Tabla de contenidos
-
-[TOC]
+Copyright (c) 2017 Diego Sáinz de Medrano.
 
 # Componentes
 
@@ -23,33 +19,10 @@ Se han usado las siguientes piezas de hardware aparte de la placa Arduino Uno:
 
 # Operación del robot
 
-```sequence
-Note left of Timer2: each 512ms...
-Timer2->loop: lcd_update_flag = true
-Note right of loop: LCD05 command
-loop-->Timer2: lcd_update_flag = false
+![operation1](operation1.png)
+![operation2](operation2.png)
+![operation3](operation3.png)
 
-Note left of Timer2: each 16ms...
-Timer2->loop: speed_check_flag = true
-Note right of loop: RD02 speed regulations
-loop-->Timer2: speed_check_flag = false
-```
-
-
-```flow
-st=>start: Loop begin
-e=>end: Loop end
-op1=>operation: Speed regulation
-op2=>operation: Liquid Display update
-cond=>condition: Speed check flag?
-cond1=>condition: LCD Update flag?
-
-st->cond
-cond(yes)->op1->cond1
-cond(no)->cond1
-cond1(yes)->op2->e
-cond1(no)->e
-```
 # Interfaz de comandos
 En el otro extremo del software está la aplicación de consola que se encarga de comunicarse con el robot a través de un módulo XBee configurado como coordinador. La aplicación está dividida en módulos encargados de diferentes tareas, como el procesado de la entrada de texto, la obtención de la fecha actual y la comunicación per se (este último módulo está basado en la aplicación *super_serial*).
 
@@ -58,72 +31,72 @@ Existen dos modos para interactuar con el robot, **normal** y **direccional**.
 ## Modo normal
 Se procesa la entrada de teclado como texto normal, y se reconocen los siguientes comandos:
 
-- `speed <s>` : acelera o decelera el robot hasta alcanzar la velocidad `s` (medida en mm/s)
-- `toggle` : cambia a modo direccional
-- `constant <k>` : cambia la constante de proporción de regulación de velocidad.
-- `quit` : detiene el robot y cierra el programa.
+* `speed <s>` : acelera o decelera el robot hasta alcanzar la velocidad `s` (medida en mm/s)
+* `toggle` : cambia a modo direccional
+* `constant <k>` : cambia la constante de proporción de regulación de velocidad.
+* `quit` : detiene el robot y cierra el programa.
 
 El módulo de control de velocidad consiste de una llamada a función que se realiza de forma síncrona con una señal del Timer2 que se activa cada 8ms. La función realiza las siguientes acciones:
 
-- registrar el tiempo y el valor de los encoders del motor
-- calcular la velocidad real usando los datos previamente registrados
-- aumentar o disminuir el código de velocidad usando esta fórmula:
+* registrar el tiempo y el valor de los encoders del motor
+* calcular la velocidad real usando los datos previamente registrados
+* aumentar o disminuir el código de velocidad usando esta fórmula:
 
 	> speed_code += K * (commanded_speed - measured_speed)
 
 ## Modo direccional
 Se procesa el pulsado de las teclas en lugar de texto. Los controles son:
 
-- `a/A` : girar a la izquierda
-- `d/D` : girar a la derecha
-- `w/W` : hacia delante
-- `s/S` : hacia atrás
-- `m/M` : cambiar a modo normal
-- `<space>` : parar
+* `a/A` : girar a la izquierda
+* `d/D` : girar a la derecha
+* `w/W` : hacia delante
+* `s/S` : hacia atrás
+* `m/M` : cambiar a modo normal
+* `<space>` : parar
 
 # Ficheros
 
-- **arduino_libs**
- - **lcd05**
-  -- **examples**
-  -- `keywords.txt`
-  -- `lcd05.cpp`
-  -- `lcd05.h`
-  -- `library.properties`
- - **rd02**
-  -- **examples**
-  -- `keywords.txt`
-  -- `rd02.cpp`
-  -- `rd02.h`
-  -- `library.properties`
- - **Time**  - github.com/PaulStoffregen
- - **Xbee** - github.com/andrewrapp
-- **arduino_sketches** - sketches para probar las librerías
- - **lcd05_arrows**
- - **lcd05_display**
- - **lcd05_time_display**
- - **lcd05_with_lib**
- - **rd02_measuring**
- - **rd02_with_lib**
-- **doc**
- - **css** - hojas de estilo para la documentación en html
- - `WirelessMotordrive.md`
- - `WirelessMotordrive.md.html`
-- **include**
- - `commands.h`
- - `connect.h`
- - `controls.h`
- - `timing.h`
-- **sketch**
- - `Makefile`
- - `xbee_bridge.ino`
-- **src**
- - `commands.cpp` - 
- - `connect.cpp`
- - `controls.cpp`
- - `main.cpp`
- - `timing.cpp`
-- `CMakeLists.txt`
+* **arduino_libs**
+  * **lcd05**
+    * **examples**
+    * `keywords.txt`
+    * `lcd05.cpp`
+    * `lcd05.h`
+    * `library.properties`
+  * **rd02**
+    * **examples**
+    * `keywords.txt`
+    * `rd02.cpp`
+    * `rd02.h`
+    * `library.properties`
+  * **Time**  - github.com/PaulStoffregen
+  * **Xbee** - github.com/andrewrapp
+* **arduino_sketches** - sketches para probar las librerías
+  * **lcd05_arrows**
+  * **lcd05_display**
+  * **lcd05_time_display**
+  * **lcd05_with_lib**
+  * **rd02_measuring**
+  * **rd02_with_lib**
+* **doc**
+  * **css** - hojas de estilo para la documentación en html
+  * `WirelessMotordrive.md`
+  * `WirelessMotordrive.md.html`
+* **include**
+  * `commands.h`
+  * `connect.h`
+  * `controls.h`
+  * `timing.h`
+* **sketch**
+  * `Makefile`
+  * `xbee_bridge.ino`
+* **src**
+  * `commands.cpp` - 
+  * `connect.cpp`
+  * `controls.cpp`
+  * `main.cpp`
+  * `timing.cpp`
+* `CMakeLists.txt`
 
 ## Instalación
 Para utilizar los sketches hace falta incluir las librerías bajo el directorio **arduino_libs** en el directorio de librerías de usuario de la instalación de Arduino en el sistema, normalmente `$HOME/Arduino/libraries`. Su uso en otros sketches está facilitado gracias a los ficheros `library.properties`, que autoinserta el `#include` necesario en los códigos fuentes al importar las librerías. También hay pequeños ejemplos incluidos en las mismas.
