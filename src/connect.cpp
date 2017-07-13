@@ -1,3 +1,23 @@
+/* connect.cpp
+ * Author: Diego Sáinz de Medrano <diego.sainzdemedrano@gmail.com>
+ * Contents based on the work of Antonio Carlos Domínguez <adominguez@iusiani.ulpgc.es>
+ *
+ * This file is part of the Wireless Motordrive project.
+ * Copyright (C) 2017 Diego Sáinz de Medrano.
+
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation in its second version.
+
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, visit https://www.gnu.org/licenses/ to get
+ * a copy.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,11 +26,13 @@
 
 #include "connect.h"
 
+// "module" global variables
 struct xbee *xbee;
 struct xbee_con *con;
 struct xbee_conAddress address;
 struct xbee_pkt* pkt;
 
+// call to set the router address
 void setup_conn() {
     memset(&address, 0, sizeof(address));
     address.addr64_enabled = 1;
@@ -25,6 +47,7 @@ void setup_conn() {
     address.addr64[7] = 0x42;
 }
 
+// establish the connection (I have no idea)
 int connect(char *port) {
     xbee_err ret=xbee_setup(&xbee,"xbeeZB",port,38400);
     if(ret!=XBEE_ENONE) {
@@ -41,6 +64,7 @@ int connect(char *port) {
     return 0;
 }
 
+// try a transmission
 int send(char *msg, int length) {
     xbee_err ret=xbee_connTx(
             con,
@@ -57,6 +81,7 @@ int send(char *msg, int length) {
     return 0;
 }
 
+// try a reception, waiting 1s
 char *receive() {
     char *msg=NULL;
     xbee_err ret=xbee_conRxWait(con,&pkt,NULL);
