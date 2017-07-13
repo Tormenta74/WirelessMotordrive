@@ -1,0 +1,2 @@
+You can find the necessary Xbee library in
+https://github.com/andrewrapp/xbee-arduino.
