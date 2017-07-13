@@ -13,4 +13,10 @@ LDFLAGS			  += -Wl,-u,vfprintf -lprintf_flt
 # ( $ARDUINO_SKETCHBOOK_DIR/libraries/ )
 ARDUINO_LIBS	  = Time Xbee lcd05 rd02 Wire
 
+# other variables to consider (not set here, but system wide)
+# ARDUINO_DIR = installation path
+# ARDUINO_SKETCHBOOK
+# ARDMK_DIR = Arduino-Makefile root path
+# AVR_TOOLS_DIR="$ARDUINO_DIR/hardware/tools/avr"
+
 include $(ARDMK_DIR)/Arduino.mk

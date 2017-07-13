@@ -1,4 +1,4 @@
-[Wireless Motordrive](https://github.com/Tormenta74/WirelessMotordrive)
+Wireless Motordrive
 ===================
 Proyecto para la Actividad Práctica 4 de [Sistemas Empotrados y de Tiempo Real](https://www2.ulpgc.es/index.php?pagina=plan_estudio&ver=pantalla&numPantalla=99&nCodAsignatura=40840&codTitulacion=4008&codPlan=40&codEspecialidad=02), en la ULPGC.
 
