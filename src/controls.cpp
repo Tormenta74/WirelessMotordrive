@@ -1,18 +1,18 @@
 /* controls.cpp
  * Author: Diego Sáinz de Medrano <diego.sainzdemedrano@gmail.com>
  *
- * This file is part of the Wireless Motordrive project.                   
+ * This file is part of the Wireless Motordrive project.
  * Copyright (C) 2017 Diego Sáinz de Medrano.
-                                                                          
+
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation.
-                                                                          
+ * the Free Software Foundation in its second version.
+
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-                                                                          
+
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, visit https://www.gnu.org/licenses/ to get
  * a copy.
@@ -24,11 +24,11 @@
 #include "controls.h"
 
 /* https://stackoverflow.com/questions/7469139/what-is-equivalent-to-getch-getche-in-linux */
-
+// <taken code>
 struct termios old, new_;
 
 /* Initialize new_ terminal i/o settings */
-void initTermios(int echo) 
+void initTermios(int echo)
 {
   tcgetattr(0, &old); /* grab old terminal i/o settings */
   new_ = old; /* make new_ settings same as old settings */
@@ -38,13 +38,13 @@ void initTermios(int echo)
 }
 
 /* Restore old terminal i/o settings */
-void resetTermios(void) 
+void resetTermios(void)
 {
   tcsetattr(0, TCSANOW, &old);
 }
 
 /* Read 1 character */
-char getch() 
+char getch()
 {
   char ch;
   initTermios(0);
@@ -52,7 +52,9 @@ char getch()
   resetTermios();
   return ch;
 }
+// </taken code>
 
+// takes a keystroke and returns a dir code
 direction_t input()
 {
     char key = getch();

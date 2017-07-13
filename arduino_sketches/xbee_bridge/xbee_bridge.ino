@@ -1,20 +1,21 @@
-/**
- * Copyright (c) 2009 Andrew Rapp. All rights reserved.
+/* xbee_bridge.ino
+ * Author: Diego Sáinz de Medrano <diego.sainzdemedrano@gmail.com>
  *
- * This file is part of XBee-Arduino.
- *
- * XBee-Arduino is free software: you can redistribute it and/or modify
+ * This file is part of the Wireless Motordrive project.
+ * Copyright (C) 2017 Diego Sáinz de Medrano.
+
+ * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * XBee-Arduino is distributed in the hope that it will be useful,
+ * the Free Software Foundation in its second version.
+
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with XBee-Arduino.  If not, see <http://www.gnu.org/licenses/>.
+
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, visit https://www.gnu.org/licenses/ to get
+ * a copy.
  */
 
 #define __STDC_LIMIT_MACROS
@@ -39,13 +40,14 @@
 #define TIMER1_TOP (int)(0.001 * (16e6 / 64.0)) - 1 // 249
 #define TIMER1_OVF_TIME_MS 1
 #define LCD_UPDATE_CYCLE 256   // 256ms
-#define SPEED_CHECK_CYCLE 8    // 8ms 
+#define SPEED_CHECK_CYCLE 8    // 8ms
 
 // timer variables
 volatile uint64_t milliseconds = 0;
 volatile bool lcd_update_flag = false;
 volatile bool speed_check_flag = false;
 
+// Timer2 interrupt vector; called every 1ms
 ISR(TIMER2_OVF_vect)
 {
   milliseconds++;
@@ -57,6 +59,7 @@ ISR(TIMER2_OVF_vect)
   }
 }
 
+// wrapped configuration registers access
 void timer2_config()
 {
   cli();
@@ -97,10 +100,9 @@ ZBTxStatusResponse txStatus = ZBTxStatusResponse();
 /*-       LCD05       -*/
 /*---------------------*/
 #define LCD05_I2C_ADDRESS byte((0xC6)>>1)
-#define MAX_LCD_MESSAGE       7
-#define LCD_TAB_LENGTH        8
 #define LCD_LINE_LENGTH       16
 
+// extra memory positions in the charset
 #define LUP_ARROW_CHAR_POS    128
 #define UP_ARROW_CHAR_POS     129
 #define RUP_ARROW_CHAR_POS    130
@@ -108,6 +110,7 @@ ZBTxStatusResponse txStatus = ZBTxStatusResponse();
 #define DOWN_ARROW_CHAR_POS   132
 #define LDOWN_ARROW_CHAR_POS  133
 
+// accesors for the char holder
 #define LEFT_UP               0
 #define UP                    1
 #define RIGTH_UP              2
@@ -118,6 +121,7 @@ ZBTxStatusResponse txStatus = ZBTxStatusResponse();
 #define LEFT                  7
 #define STOP                  8
 
+// number of extra written chars
 #define SPECIAL_CHARS_NUM     6
 
 // bitmaps
@@ -153,6 +157,7 @@ const char direction_chars[SPECIAL_CHARS_NUM+3] = {
   LUP_ARROW_CHAR_POS, UP_ARROW_CHAR_POS, RUP_ARROW_CHAR_POS, 0b01111110, RDOWN_ARROW_CHAR_POS, DOWN_ARROW_CHAR_POS, LDOWN_ARROW_CHAR_POS, 0b01111111, 0b11011011
 };
 
+// drains the r/w register of the lcd
 void fifo_wait()
 {
   while(lcd05::read_fifo_length(LCD05_I2C_ADDRESS)<4);
@@ -212,6 +217,7 @@ void add_arrow_chars()
     if(bytes_array[i]) free(bytes_array[i]);
 }
 
+// populates the LCD starting from home
 void top_left_corner(char *msg, int length)
 {
   fifo_wait();
@@ -220,6 +226,8 @@ void top_left_corner(char *msg, int length)
   lcd05::ascii_chars(LCD05_I2C_ADDRESS, msg, length);
 }
 
+// populates the LCD top-right from "right to left"; that is,
+// it will only write the last lenght positions of the corner
 void top_right_corner(char *msg, int length)
 {
   fifo_wait();
@@ -228,6 +236,7 @@ void top_right_corner(char *msg, int length)
   lcd05::ascii_chars(LCD05_I2C_ADDRESS, msg, length);
 }
 
+// populates the LCD starting from just under home
 void bottom_left_corner(char *msg, int length)
 {
   fifo_wait();
@@ -237,6 +246,8 @@ void bottom_left_corner(char *msg, int length)
   lcd05::ascii_chars(LCD05_I2C_ADDRESS, msg, length);
 }
 
+// populates the LCD bottom-right from "right to left"; that is,
+// it will only write the last lenght positions of the corner
 void bottom_right_corner(char *msg, int length)
 {
   fifo_wait();
@@ -262,26 +273,35 @@ void bottom_right_corner(char *msg, int length)
 #define DUMMY                 0
 #define NORMAL                1
 
+// according to the RD02 documentation
 #define WHEEL_DIAMETRE_MM     100
-#define WHEEL_DIAMETRE        0.1
 
-const int64_t CORRIDOR_LENGTH = INT32_MAX - INT32_MIN;
+// this was a failed attempt: it works, but it is useless
+// in calculations or printing, for that matter
+//const int64_t CORRIDOR_LENGTH = INT32_MAX - INT32_MIN;
 
+// drive mode controller
 int drive_mode = DUMMY;
 // commanded speed is in m/s; it was converted when we parsed the command
 double commanded_speed = 0.0, measured_speed1=0.0, measured_speed2=0.0;
 
+// this is what will be written to the corresponding registers
+// these vars are manipulated in the regulate_speed function
 int8_t speed_code1=0, speed_code2=0;
+// storage for the motor encoding readings
 int32_t enc1[2]={0}, enc2[2]={0};
+// storage for the timestamps (in ms)
 uint64_t time1[2]={0}, time2[2]={0};
 
 // each tick on the encoder means one degree (in 360º) of advance
 // on the wheel. given that we know the diametre of the wheel, we
 // can calculate how much distance is traveled per tick
-
 const double ADVANCE_PER_TICK_MM = (double)WHEEL_DIAMETRE_MM*M_PI/(double)360;
+
+// proportional speed control constant (see regulate_speed)
 double K = 10.00;
 
+// int64_t implementation of abs()
 int64_t i64abs(int64_t num)
 {
   if(num < 0)
@@ -289,6 +309,9 @@ int64_t i64abs(int64_t num)
   return num;
 }
 
+// measures the current speed of the motor by reading the
+// encoder and registering the times, comparing to the desired
+// speed and augmenting/decrementing the speed codes
 void regulate_speed()
 {
   int64_t delta1=0, delta2=0, delta1c=0, delta2c=0;
@@ -316,6 +339,7 @@ void regulate_speed()
   // compare with target (target is in mm/s!!)
   speed_code1 += K*(commanded_speed-measured_speed1);
 
+  // debug information
   if(lcd_update_flag) {
     Serial.print("\ntarget speed (m/s) = "); Serial.println(commanded_speed,6);
     Serial.print("speed1 (m/s) = "); Serial.println(measured_speed1,6);
@@ -347,12 +371,13 @@ void regulate_speed()
   enc2[PREV] = enc2[CURR]; time2[PREV] = time2[CURR];
 }
 
+// simple control center to always manage the RD02 motors
 void motor_control()
 {
   // regulate speed codes
   if(drive_mode == NORMAL) {
     regulate_speed();
-  } 
+  }
   // always set speeds
   rd02::set_speed1(RD02_I2C_ADDRESS,speed_code1);
   rd02::set_speed2(RD02_I2C_ADDRESS,speed_code2);
@@ -364,21 +389,9 @@ void motor_control()
 /*----------------------*/
 /*-        Time        -*/
 /*----------------------*/
-#define START_YEAR            1970
 #define DATE_MSG_LENGTH       5
 
-const int dt_SHORT_STR_LEN = 3;
-
-// single character message tags
-#define TIME_HEADER   'T'   // Header tag for serial time sync message
-#define FORMAT_HEADER 'F'   // Header tag indicating a date format message
-#define FORMAT_SHORT  's'   // short month and day strings
-#define FORMAT_LONG   'l'   // (lower case l) long month and day strings
-
-#define TIME_REQUEST  7     // ASCII bell character requests a time sync message
-
-const unsigned long DEFAULT_TIME = 1499425843; // fri jul  7 11:11:03 UTC 2017
-
+// set time
 void processSyncMessage(time_t pctime)
 {
   setTime(pctime);
@@ -401,6 +414,7 @@ void setup()
   delay(LCD05_I2C_INIT_DELAY);
 
   // hardware configs
+
   Serial.print(F("setting up LCD05 with address 0x"));
   Serial.print(LCD05_I2C_ADDRESS<<1,HEX);
   Serial.println(F("..."));
@@ -423,31 +437,38 @@ void setup()
   rd02::set_speed1(RD02_I2C_ADDRESS, 0);
   rd02::set_speed2(RD02_I2C_ADDRESS, 0);
   rd02::reset_encoders(RD02_I2C_ADDRESS);
+  // warning: this calls are blocking, and you will not be
+  // able to run this program if the RD02 is not wired
   time1[PREV] = milliseconds;
-  //enc1[PREV] = rd02::read_enc1(RD02_I2C_ADDRESS);
+  enc1[PREV] = rd02::read_enc1(RD02_I2C_ADDRESS);
   time2[PREV] = milliseconds;
-  //enc2[PREV] = rd02::read_enc2(RD02_I2C_ADDRESS);
+  enc2[PREV] = rd02::read_enc2(RD02_I2C_ADDRESS);
   Serial.println(F("done."));
 
   // start function: request time
   Serial.print(F("configuring time (requesting UTC time)..."));
 
+  // prompt
   top_left_corner((char*)" start console",14);
 }
 
+// contains the to right corner displayed character
 char direction_buffer[1] = {direction_chars[STOP]};
 
 // continuously reads packets, looking for ZB Receive or Modem Status
 void loop()
 {
-  char lcd_buffer[MAX_LCD_MESSAGE];
+  char lcd_buffer[LCD_LINE_LENGTH];
   uint8_t payload[MAX_ZB_PAYLOAD_LENGTH];
 
+  // do not run anything until the console has connected and time has been set
   if(!(timeStatus() != timeSet)) {
+    // each SPEED_CHECK_CYCLE ms
     if(speed_check_flag) {
       motor_control();
     }
 
+    // each LCD_UPDATE_CYCLE ms
     // update liquid crystal display
     if(lcd_update_flag) {
       lcd05::clear_screen(LCD05_I2C_ADDRESS);
@@ -475,14 +496,15 @@ void loop()
       sprintf(lcd_buffer,"%02d:%02d",hour(),minute());
       bottom_right_corner(lcd_buffer,DATE_MSG_LENGTH);
 
+      // reset the update flag
       lcd_update_flag = false;
     }
   }
 
-
+  // just in case (without this, payload used to cause problems)
+  memset(payload,0,MAX_ZB_PAYLOAD_LENGTH*sizeof(int8_t));
   // listen to the network
   xbee.readPacket();
-  memset(payload,0,MAX_ZB_PAYLOAD_LENGTH*sizeof(int8_t));
 
   if(xbee.getResponse().isAvailable()) { // got something
 
@@ -497,7 +519,6 @@ void loop()
           rx.getData(),
           min(MAX_ZB_PAYLOAD_LENGTH,rx.getDataLength())
           );
-
 
       // sending the echo back
       // echo is equivalent to acknowledged in console application
@@ -540,17 +561,18 @@ void loop()
         default:
           direction_buffer[0] = direction_chars[STOP];
         }
-      } else if(*(char*)payload == 'S') {
+      } else if(*(char*)payload == 'S') { // process speed message
         // commanded speed comes in in mm / s
         drive_mode = NORMAL;
         direction_buffer[0] = 'N';
         commanded_speed = (double)atoi((char*)(payload+1))/1000.0;
+
         Serial.print("setting speed to "); Serial.print(commanded_speed);
         Serial.println("m/s");
-      } else if(*(char*)payload == 'T') {
+      } else if(*(char*)payload == 'T') { // process time sync message
         time_t time = atol((char*)payload+1);
         processSyncMessage(time);
-      } else if(*(char*)payload == 'K') {
+      } else if(*(char*)payload == 'K') { // process K set message
         int k = atoi((char*)payload+1);
         K = 1.0*k;
       }

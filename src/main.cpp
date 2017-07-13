@@ -1,12 +1,12 @@
 /* main.cpp
  * Author: Diego Sáinz de Medrano <diego.sainzdemedrano@gmail.com>
  *
- * This file is part of the Wireless Motordrive project.                   
+ * This file is part of the Wireless Motordrive project.
  * Copyright (C) 2017 Diego Sáinz de Medrano.
 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation.
+ * the Free Software Foundation in its second version.
 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -29,6 +29,8 @@
 #include "controls.h"
 #include "commands.h"
 #include "timing.h"
+
+#define MAX_COMMAND_STR 6
 
 void print_normal_mode_help()
 {
@@ -60,6 +62,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // connect to the router
     setup_conn();
     if(connect(argv[1]) != 0) {
         return 2;
@@ -78,48 +81,56 @@ int main(int argc, char *argv[])
     bool normal_mode = false;
     print_dummy_mode_help();
     direction_t dir;
-    char cmd_msg[6];
+    char cmd_msg[MAX_COMMAND_STR];
     while(1) {
+        // switch between the modes: read lines, or read keystrokes
         if(normal_mode) {
             std::string command;
             std::getline(std::cin,command);
 
+            // commands can contain an integer
             int data;
             command_t code = process_cmd(command,&data);
-            printf("sending ");
             switch(code) {
             case SPEED:
                 if(data < -2000 || data > 2000) {
                     printf("speed must be between [-2000,2000]\n");
                     break;
                 }
+                // 'S' prefix for speed messages
                 sprintf(cmd_msg,"S%d",data);
-                printf("%s\n",cmd_msg);
+                // and down the channel
                 send(cmd_msg,strlen(cmd_msg));
                 break;
             case CONST:
                 if(data < 1 || data > 100) {
                     printf("constant must be between [1,200]\n");
                 }
+                // 'K' prefix for constant messages
                 sprintf(cmd_msg,"K%d",data);
-                printf("%s\n",cmd_msg);
+                // and down the channel
                 send(cmd_msg,strlen(cmd_msg));
                 break;
             case DUMMY:
+                // in the next iteration of the while, we will enter the other branch
                 normal_mode = false;
                 printf("\nSwitching to dummy mode\n");
                 print_dummy_mode_help();
                 break;
             case END:
+                // stop the robot and exit
                 send((char*)"D0",2);
-                printf("D0\n");
                 return 0; // correct exit point
             default:
+                // yeah, I mix C and C++ just like that
                 std::cerr << '"' << command << '"'
                     << " command not recognized" << std::endl;
             }
         } else {
+            // get the keystroke
             dir = input();
+            // pretty straight forward
+            // 'D' prefix for dummy mode directions
             switch(dir) {
             case FORWARD:
                 send((char*)"D1",2);
@@ -137,19 +148,22 @@ int main(int argc, char *argv[])
                 send((char*)"D0",2);
                 break;
             case TOGGLE:
+                // in the next iteration of the while, we will enter the other branch
                 normal_mode = true;
                 printf("\nSwitching to normal mode\n");
                 print_normal_mode_help();
                 break;
             case QUIT:
+                // stop the robot and exit
                 send((char*)"D0",1);
                 return 0; // correct exit point
             default:
+                // it should never happen
                 send((char*)"none",4);
             }
         }
     }
-
+    // indication of something going wrong
     return 3;
 }
 
