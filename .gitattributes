@@ -2,4 +2,5 @@
 arduino_libs/Xbee/* linguist-vendored
 arduino_libs/Time/* linguist-vendored
 
+arduino_libs/Xbee/docs/*    linguist-documentation
 doc/*   linguist-documentation
