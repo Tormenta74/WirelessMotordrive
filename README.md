@@ -25,10 +25,46 @@ Se han usado las siguientes piezas de hardware aparte de la placa Arduino Uno:
 
 ![operation3](operation3.png)
 
+Nota: estas comprobaciones sólo se realizan una vez un comando de sincronización temporal ha sido recibido.
+
+Después de realizar estas comprobaciones, se procede a comprobar si existen nuevos mensajes recibidos vía el router XBee montado sobre el wireless SD shield. De haberlo, se procesa de la siguiente manera:
+
+Se toma el prefijo del mensaje, que debe consistir del primer caracter del mismo, y se parsea el resto del mensaje en un número entero que servirá como parámetro.
+
+Prefijo | Acción
+--------|---------
+T | Sincronizar el tiempo de la librería [Time](https://github.com/PaulStoffregen/Time)
+S  | Indicar la nueva velocidad deseada al módulo de regulación de velocidad
+D  | Indicar la nueva dirección del robot
+K  | Actualizar la constante de regulación de velocidad
+
 # Interfaz de comandos
 En el otro extremo del software está la aplicación de consola que se encarga de comunicarse con el robot a través de un módulo XBee configurado como coordinador. La aplicación está dividida en módulos encargados de diferentes tareas, como el procesado de la entrada de texto, la obtención de la fecha actual y la comunicación per se (este último módulo está basado en la aplicación *super_serial*).
 
 Existen dos modos para interactuar con el robot, **normal** y **direccional**.
+
+# Liquid Crystal Display
+
+En el LCD imprimiremos las informaciones relevantes actualizadas del robot. En el iniciado del sistema, se imprimirá un único mensaje mientras el tiempo no esté sincronizado: `start console`.
+
+Una vez iniciado el programa, habrá dos modos de display: uno para cuando estemos en modo direccional, en el que mostraremos:
+Esquina | Mensaje
+-|-
+superior izquierda | Código de velocidad del motor izquierdo
+inferior izquierda | Código de velocidad del motor derecho
+superior derecha | Flecha direccional o símbolo de parada
+
+Las flechas direccionales son tanto propias del set de carácteres predefinidos como añadidas al inicio del programa mediante mapas de bits: ver [la documentación del LCD05](http://www.robot-electronics.co.uk/htm/Lcd05tech.htm) y los sketchs de ejemplo para más información.
+
+En el modo normal, mostraremos lo siguiente:
+
+Esquina | Mensaje
+-|-
+superior izquierda | Velocidad lineal del motor izquierdo
+inferior izquierda | Velocidad lineal del motor derecho
+superior derecha | Letra 'N'
+
+Común a ambos modos es el mensaje de la esquina inferior derecha, que muestra la hora y el minuto actuales.
 
 ## Modo normal
 Se procesa la entrada de teclado como texto normal, y se reconocen los siguientes comandos:
