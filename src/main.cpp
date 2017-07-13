@@ -33,8 +33,8 @@
 void print_normal_mode_help()
 {
     printf("Type one of the following commands to interact with the robot:\n");
-    printf("\tspeed <n>: sets the robot motor drive speed register to n (n must be between -128 and 127)\n");
-    printf("\t[nyi]encoder <n>: fetches the latest encoder n value (n must be 1 or 2)\n");
+    printf("\tspeed <n>: sets the robot motor drive speed to n (n must be between\n\t\t-2000 and 2000, and is measured in mm/s)\n");
+    printf("\tconstant <n>: changes the speed regulation constant (must be between 1 and 200)\n");
     printf("\ttoggle: changes the controls to \"dummy\" mode\n");
     printf("\tquit: exits the program (sending a stop signal to the robot)\n");
 }
@@ -89,16 +89,21 @@ int main(int argc, char *argv[])
             printf("sending ");
             switch(code) {
             case SPEED:
-                //printf("speed command!\n");
-                if(data < -200 || data > 200) {
-                    printf("speed must be between [-200,200]\n");
+                if(data < -2000 || data > 2000) {
+                    printf("speed must be between [-2000,2000]\n");
+                    break;
                 }
                 sprintf(cmd_msg,"S%d",data);
                 printf("%s\n",cmd_msg);
                 send(cmd_msg,strlen(cmd_msg));
                 break;
-            case ENC:
-                //printf("encoder command!\n");
+            case CONST:
+                if(data < 1 || data > 100) {
+                    printf("constant must be between [1,200]\n");
+                }
+                sprintf(cmd_msg,"K%d",data);
+                printf("%s\n",cmd_msg);
+                send(cmd_msg,strlen(cmd_msg));
                 break;
             case DUMMY:
                 normal_mode = false;

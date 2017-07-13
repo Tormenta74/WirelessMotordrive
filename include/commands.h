@@ -3,7 +3,7 @@
 
 #include <string>
 
-typedef enum {SPEED, ENC, DUMMY, END, CMD_ERR} command_t;
+typedef enum {SPEED, CONST, DUMMY, END, CMD_ERR} command_t;
 
 command_t process_cmd(std::string &cmd, int *param);
 

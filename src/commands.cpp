@@ -24,10 +24,10 @@
 
 #include "commands.h"
 
-const std::string speed_str = "speed";
-const std::string enc_str = "encoder";
-const std::string toggle_str = "toggle";
+const std::string k_str = "constant";
 const std::string quit_str = "quit";
+const std::string speed_str = "speed";
+const std::string toggle_str = "toggle";
 
 /* https://stackoverflow.com/questions/236129/split-a-string-in-c#answer-236803 */
 template<typename Out>
@@ -63,8 +63,13 @@ command_t process_cmd(std::string &cmd, int *param)
                 fprintf(stderr, "commands: %s", msg);
             }
             return SPEED;
-        } else if(tokens.front() == enc_str) {
-            return ENC;
+        } else if(tokens.front() == k_str) {
+            try {
+                *param = std::stoi(tokens.back());
+            } catch (const char* msg) {
+                fprintf(stderr, "commands: %s", msg);
+            }
+            return CONST;
         } else if(tokens.front() == toggle_str) {
             return DUMMY;
         } else if(tokens.front() == quit_str) {

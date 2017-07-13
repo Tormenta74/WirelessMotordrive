@@ -39,7 +39,7 @@
 #define TIMER1_TOP (int)(0.001 * (16e6 / 64.0)) - 1 // 249
 #define TIMER1_OVF_TIME_MS 1
 #define LCD_UPDATE_CYCLE 256   // 256ms
-#define SPEED_CHECK_CYCLE 16   // 16ms 
+#define SPEED_CHECK_CYCLE 8    // 8ms 
 
 // timer variables
 volatile uint64_t milliseconds = 0;
@@ -268,25 +268,19 @@ void bottom_right_corner(char *msg, int length)
 const int64_t CORRIDOR_LENGTH = INT32_MAX - INT32_MIN;
 
 int drive_mode = DUMMY;
-// commanded speed is in mm/s
-double commanded_speed = 0;
-double measured_speed1=0, measured_speed2=0;
+// commanded speed is in m/s; it was converted when we parsed the command
+double commanded_speed = 0.0, measured_speed1=0.0, measured_speed2=0.0;
 
 int8_t speed_code1=0, speed_code2=0;
 int32_t enc1[2]={0}, enc2[2]={0};
 uint64_t time1[2]={0}, time2[2]={0};
 
-// question: how does an encoder delta relate to
-// the linear speed of the motor?
-//
-// NOTE: irrelevant paragraph
-//
 // each tick on the encoder means one degree (in 360º) of advance
 // on the wheel. given that we know the diametre of the wheel, we
 // can calculate how much distance is traveled per tick
 
 const double ADVANCE_PER_TICK_MM = (double)WHEEL_DIAMETRE_MM*M_PI/(double)360;
-const double K = 0.01;
+double K = 10.00;
 
 int64_t i64abs(int64_t num)
 {
@@ -297,16 +291,13 @@ int64_t i64abs(int64_t num)
 
 void regulate_speed()
 {
-  int64_t delta1=0, delta2=0, delta1c=0, delta_comparison=0;
-  double speed=0.0;
-  int target_delta=0;
+  int64_t delta1=0, delta2=0, delta1c=0, delta2c=0;
 
   // register time
   time1[CURR] = milliseconds;
 
   // get new encoder value
   enc1[CURR] = rd02::read_enc1(RD02_I2C_ADDRESS);
-  //Serial.print("enc[CURR] = "); Serial.println((long)enc1[CURR]);
 
   // compare with previous
   delta1 = enc1[CURR] - enc1[PREV];
@@ -323,39 +314,33 @@ void regulate_speed()
   measured_speed1 = static_cast<double>(delta1) * ADVANCE_PER_TICK_MM / (time1[CURR] - time1[PREV]);
 
   // compare with target (target is in mm/s!!)
-  speed_code1 += K*(commanded_speed-measured_speed1*1000.0);
+  speed_code1 += K*(commanded_speed-measured_speed1);
 
   if(lcd_update_flag) {
-    //Serial.print("\nspeed (m/s) = "); Serial.println(measured_speed1,6);
-    //Serial.print("\ntarget speed (m/s) = "); Serial.println(commanded_speed/1000.0,6);
-    //Serial.print("new speed code = "); Serial.println((int)speed_code1);
+    Serial.print("\ntarget speed (m/s) = "); Serial.println(commanded_speed,6);
+    Serial.print("speed1 (m/s) = "); Serial.println(measured_speed1,6);
+    Serial.print("new speed1 code = "); Serial.println((int)speed_code1);
   }
 
 
   // --------------------
   // repeat for encoder 2
-  /*time2[CURR] = milliseconds;
-    enc2[CURR] = rd02::read_enc2(RD02_I2C_ADDRESS);
-    delta2 = enc2[CURR] - enc2[PREV];
-    delta2 = (abs(delta2) < abs(CORRIDOR_LENGTH - (delta2)))
-    ? delta2 : CORRIDOR_LENGTH - (delta2);
-    if(abs(delta2) > CORRIDOR_LENGTH - abs(delta2)) {
+  time2[CURR] = milliseconds;
+  enc2[CURR] = rd02::read_enc2(RD02_I2C_ADDRESS);
+  delta2 = enc2[CURR] - enc2[PREV];
+  delta2c = INT32_MAX - i64abs(delta2) - INT32_MIN;
+  if(i64abs(delta2) > i64abs(delta2c)) {
     if(delta2 < 0)
-    delta2 = -1 * (CORRIDOR_LENGTH - abs(delta2));
+      delta2 = delta2c;
     else
-    delta2 = CORRIDOR_LENGTH - abs(delta2);
-    }
-    measured_speed2 = (double)delta1 * ADVANCE_PER_TICK_MM / (time2[CURR] - time2[PREV]);
-    speed = 1000.0 * measured_speed1;
-    if(speed < commanded_speed) {
-    speed_code2 += SPEED_CONTROL_STEP;
-    if(speed_code2 > MAX_SPEED)
-    speed_code2 = MAX_SPEED;
-    } else {
-    speed_code2 -= SPEED_CONTROL_STEP;
-    if(speed_code2 < -MAX_SPEED)
-    speed_code2 = -MAX_SPEED;
-    }*/
+      delta2 = -delta2c;
+  }
+  measured_speed2 = static_cast<double>(delta2) * ADVANCE_PER_TICK_MM / (time2[CURR] - time2[PREV]);
+  speed_code2 += K*(commanded_speed-measured_speed2);
+  if(lcd_update_flag) {
+    Serial.print("\nspeed2 (m/s) = "); Serial.println(measured_speed2,6);
+    Serial.print("new speed2 code = "); Serial.println((int)speed_code2);
+  }
 
   // store encoder values for future measurement
   enc1[PREV] = enc1[CURR]; time1[PREV] = time1[CURR];
@@ -366,7 +351,7 @@ void motor_control()
 {
   // regulate speed codes
   if(drive_mode == NORMAL) {
-    //regulate_speed();
+    regulate_speed();
   } 
   // always set speeds
   rd02::set_speed1(RD02_I2C_ADDRESS,speed_code1);
@@ -468,13 +453,19 @@ void loop()
       lcd05::clear_screen(LCD05_I2C_ADDRESS);
 
       // top left
-      //sprintf(lcd_buffer,"M1:% 2.1fm/s",measured_speed1);
-      sprintf(lcd_buffer,"S1:%d",speed_code1);
+      if(drive_mode == DUMMY) {
+          sprintf(lcd_buffer,"S1:%d",speed_code1);
+      } else {
+          sprintf(lcd_buffer,"M1:% 2.1fm/s",measured_speed1);
+      }
       top_left_corner(lcd_buffer,strlen(lcd_buffer));
 
       // bottom left
-      //sprintf(lcd_buffer,"M2:% 2.1fm/s",measured_speed2);
-      sprintf(lcd_buffer,"S2:%d",speed_code2);
+      if(drive_mode == DUMMY) {
+          sprintf(lcd_buffer,"S2:%d",speed_code2);
+      } else {
+          sprintf(lcd_buffer,"M2:% 2.1fm/s",measured_speed2);
+      }
       bottom_left_corner(lcd_buffer,strlen(lcd_buffer));
 
       // top right
@@ -517,8 +508,7 @@ void loop()
           );
       xbee.send(tx);
 
-      // switch mode
-      // normal mode: process possible commands
+      // process command prefix
 
       // dummy mode: process arrow commands
       if(*(char*)payload == 'D') {
@@ -551,14 +541,18 @@ void loop()
           direction_buffer[0] = direction_chars[STOP];
         }
       } else if(*(char*)payload == 'S') {
+        // commanded speed comes in in mm / s
         drive_mode = NORMAL;
         direction_buffer[0] = 'N';
-        commanded_speed = (double)atoi((char*)(payload+1));
-        Serial.print("setting speed to "); Serial.print(commanded_speed / 1000.0);
+        commanded_speed = (double)atoi((char*)(payload+1))/1000.0;
+        Serial.print("setting speed to "); Serial.print(commanded_speed);
         Serial.println("m/s");
       } else if(*(char*)payload == 'T') {
         time_t time = atol((char*)payload+1);
         processSyncMessage(time);
+      } else if(*(char*)payload == 'K') {
+        int k = atoi((char*)payload+1);
+        K = 1.0*k;
       }
 
       // rx log
