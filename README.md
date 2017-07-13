@@ -20,7 +20,9 @@ Se han usado las siguientes piezas de hardware aparte de la placa Arduino Uno:
 # Operación del robot
 
 ![operation1](operation1.png)
+
 ![operation2](operation2.png)
+
 ![operation3](operation3.png)
 
 # Interfaz de comandos
