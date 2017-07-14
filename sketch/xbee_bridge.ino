@@ -314,8 +314,45 @@ int64_t i64abs(int64_t num)
 // speed and augmenting/decrementing the speed codes
 void regulate_speed()
 {
-  int64_t delta1=0, delta2=0, delta1c=0, delta2c=0;
   double inc=0.0;
+
+  // compare with target 
+  // measured speed was just set
+  inc = K*(commanded_speed-measured_speed1);
+  if((double)speed_code1 + inc > MAX_SPEED) {
+    speed_code1 = MAX_SPEED;
+  } else if((double)speed_code1 + inc < -MAX_SPEED) {
+    speed_code1 = -MAX_SPEED;
+  } else {
+    speed_code1 += inc;
+  }
+
+  // debug information
+  if(lcd_update_flag) {
+    Serial.print("\ntarget speed (m/s) = "); Serial.println(commanded_speed,6);
+    Serial.print("speed1 (m/s) = "); Serial.println(measured_speed1,6);
+    Serial.print("increment = "); Serial.println(K*(commanded_speed-measured_speed1));
+    Serial.print("new speed1 code = "); Serial.println((int)speed_code1);
+  }
+
+  inc = K*(commanded_speed-measured_speed2);
+  if((double)speed_code2 + inc > MAX_SPEED) {
+    speed_code2 = MAX_SPEED;
+  } else if((double)speed_code2 + inc < -MAX_SPEED) {
+    speed_code2 = -MAX_SPEED;
+  } else {
+    speed_code2 += inc;
+  }
+  if(lcd_update_flag) {
+    Serial.print("\nspeed2 (m/s) = "); Serial.println(measured_speed2,6);
+    Serial.print("new speed2 code = "); Serial.println((int)speed_code2);
+  }
+}
+
+// simple control center to always manage the RD02 motors
+void motor_control()
+{
+  int64_t delta1=0, delta2=0, delta1c=0, delta2c=0;
 
   // register time
   time1[CURR] = milliseconds;
@@ -337,25 +374,6 @@ void regulate_speed()
   // get corresponding velocity (in mm/ms)
   measured_speed1 = static_cast<double>(delta1) * ADVANCE_PER_TICK_MM / (time1[CURR] - time1[PREV]);
 
-  // compare with target 
-  inc = K*(commanded_speed-measured_speed1);
-  if((double)speed_code1 + inc > MAX_SPEED) {
-    speed_code1 = MAX_SPEED;
-  } else if((double)speed_code1 + inc < -MAX_SPEED) {
-    speed_code1 = -MAX_SPEED;
-  } else {
-    speed_code1 += inc;
-  }
-
-  // debug information
-  if(lcd_update_flag) {
-    Serial.print("\ntarget speed (m/s) = "); Serial.println(commanded_speed,6);
-    Serial.print("speed1 (m/s) = "); Serial.println(measured_speed1,6);
-    Serial.print("increment = "); Serial.println(K*(commanded_speed-measured_speed1));
-    Serial.print("new speed1 code = "); Serial.println((int)speed_code1);
-  }
-
-
   // --------------------
   // repeat for encoder 2
   time2[CURR] = milliseconds;
@@ -369,27 +387,7 @@ void regulate_speed()
       delta2 = -delta2c;
   }
   measured_speed2 = static_cast<double>(delta2) * ADVANCE_PER_TICK_MM / (time2[CURR] - time2[PREV]);
-  inc = K*(commanded_speed-measured_speed2);
-  if((double)speed_code2 + inc > MAX_SPEED) {
-    speed_code2 = MAX_SPEED;
-  } else if((double)speed_code2 + inc < -MAX_SPEED) {
-    speed_code2 = -MAX_SPEED;
-  } else {
-    speed_code2 += inc;
-  }
-  if(lcd_update_flag) {
-    Serial.print("\nspeed2 (m/s) = "); Serial.println(measured_speed2,6);
-    Serial.print("new speed2 code = "); Serial.println((int)speed_code2);
-  }
 
-  // store encoder values for future measurement
-  enc1[PREV] = enc1[CURR]; time1[PREV] = time1[CURR];
-  enc2[PREV] = enc2[CURR]; time2[PREV] = time2[CURR];
-}
-
-// simple control center to always manage the RD02 motors
-void motor_control()
-{
   // regulate speed codes
   if(drive_mode == NORMAL) {
     regulate_speed();
@@ -397,6 +395,11 @@ void motor_control()
   // always set speeds
   rd02::set_speed1(RD02_I2C_ADDRESS,speed_code1);
   rd02::set_speed2(RD02_I2C_ADDRESS,speed_code2);
+
+  // store encoder values for future measurement
+  enc1[PREV] = enc1[CURR]; time1[PREV] = time1[CURR];
+  enc2[PREV] = enc2[CURR]; time2[PREV] = time2[CURR];
+
   // reset flag
   speed_check_flag = false;
 }
@@ -469,7 +472,7 @@ void setup()
 }
 
 // contains the to right corner displayed character
-char direction_buffer[1] = {direction_chars[STOP]};
+char direction_buffer[DATE_MSG_LENGTH];
 
 // continuously reads packets, looking for ZB Receive or Modem Status
 void loop()
@@ -490,23 +493,15 @@ void loop()
       lcd05::clear_screen(LCD05_I2C_ADDRESS);
 
       // top left
-      if(drive_mode == DUMMY) {
-          sprintf(lcd_buffer,"S1:%d",speed_code1);
-      } else {
-          sprintf(lcd_buffer,"M1:% 2.1fm/s",measured_speed1);
-      }
+      sprintf(lcd_buffer,"M1:% 2.3f",measured_speed1);
       top_left_corner(lcd_buffer,strlen(lcd_buffer));
 
       // bottom left
-      if(drive_mode == DUMMY) {
-          sprintf(lcd_buffer,"S2:%d",speed_code2);
-      } else {
-          sprintf(lcd_buffer,"M2:% 2.1fm/s",measured_speed2);
-      }
+      sprintf(lcd_buffer,"M2:% 2.3f",measured_speed2);
       bottom_left_corner(lcd_buffer,strlen(lcd_buffer));
 
       // top right
-      top_right_corner(direction_buffer,1);
+      top_right_corner(direction_buffer,DATE_MSG_LENGTH);
 
       // bottom right
       sprintf(lcd_buffer,"%02d:%02d",hour(),minute());
@@ -547,40 +542,48 @@ void loop()
 
       // process command prefix
 
+      // top right corner always shows units, and for each direction /
+      // mode it shows a special character.
+      sprintf(direction_buffer,"%s","m/s  ");
+
       // dummy mode: process arrow commands
       if(*(char*)payload == 'D') {
         drive_mode = DUMMY;
         commanded_speed = 0.0;
         switch(*((char*)payload+1)) {
+        // for each case: set the speed codes to defined values
+        // set the special char in the last position
         case '0':
           speed_code1 = speed_code2 = 0;
-          direction_buffer[0] = direction_chars[STOP];
+          direction_buffer[4] = direction_chars[STOP];
           break;
         case '1':
           speed_code1 = speed_code2 = DUMMY_STRAIGHT_SPEED;
-          direction_buffer[0] = direction_chars[UP];
+          direction_buffer[4] = direction_chars[UP];
           break;
         case '2':
           speed_code1 = speed_code2 = -DUMMY_STRAIGHT_SPEED;
-          direction_buffer[0] = direction_chars[DOWN];
+          direction_buffer[4] = direction_chars[DOWN];
           break;
         case '3':
           speed_code1 = DUMMY_TURN_SPEED;
           speed_code2 = -DUMMY_TURN_SPEED;
-          direction_buffer[0] = direction_chars[LEFT];
+          direction_buffer[4] = direction_chars[LEFT];
           break;
         case '4':
           speed_code1 = -DUMMY_TURN_SPEED;
           speed_code2 = DUMMY_TURN_SPEED;
-          direction_buffer[0] = direction_chars[RIGHT];
+          direction_buffer[4] = direction_chars[RIGHT];
           break;
         default:
-          direction_buffer[0] = direction_chars[STOP];
+          direction_buffer[4] = direction_chars[STOP];
         }
       } else if(*(char*)payload == 'S') { // process speed message
-        // commanded speed comes in in mm / s
+        // this will trigger debug output in regulate_speed
         drive_mode = NORMAL;
-        direction_buffer[0] = 'N';
+        // special char represents Normal mode
+        direction_buffer[4] = 'N';
+        // commanded speed comes in in mm / s, so we translate it
         commanded_speed = (double)atoi((char*)(payload+1))/1000.0;
 
         Serial.print("setting speed to "); Serial.print(commanded_speed);
