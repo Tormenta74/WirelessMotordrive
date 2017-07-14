@@ -262,7 +262,7 @@ void bottom_right_corner(char *msg, int length)
 #define RD02_I2C_ADDRESS      byte((0xB0)>>1)
 #define DUMMY_STRAIGHT_SPEED  32
 #define DUMMY_TURN_SPEED      24
-#define MAX_SPEED             63
+#define MAX_SPEED             127
 #define SPEED_CONTROL_STEP    2
 
 // buffers' positions
@@ -315,6 +315,7 @@ int64_t i64abs(int64_t num)
 void regulate_speed()
 {
   int64_t delta1=0, delta2=0, delta1c=0, delta2c=0;
+  double inc=0.0;
 
   // register time
   time1[CURR] = milliseconds;
@@ -336,13 +337,21 @@ void regulate_speed()
   // get corresponding velocity (in mm/ms)
   measured_speed1 = static_cast<double>(delta1) * ADVANCE_PER_TICK_MM / (time1[CURR] - time1[PREV]);
 
-  // compare with target (target is in mm/s!!)
-  speed_code1 += K*(commanded_speed-measured_speed1);
+  // compare with target 
+  inc = K*(commanded_speed-measured_speed1);
+  if((double)speed_code1 + inc > MAX_SPEED) {
+    speed_code1 = MAX_SPEED;
+  } else if((double)speed_code1 + inc < -MAX_SPEED) {
+    speed_code1 = -MAX_SPEED;
+  } else {
+    speed_code1 += inc;
+  }
 
   // debug information
   if(lcd_update_flag) {
     Serial.print("\ntarget speed (m/s) = "); Serial.println(commanded_speed,6);
     Serial.print("speed1 (m/s) = "); Serial.println(measured_speed1,6);
+    Serial.print("increment = "); Serial.println(K*(commanded_speed-measured_speed1));
     Serial.print("new speed1 code = "); Serial.println((int)speed_code1);
   }
 
@@ -360,7 +369,14 @@ void regulate_speed()
       delta2 = -delta2c;
   }
   measured_speed2 = static_cast<double>(delta2) * ADVANCE_PER_TICK_MM / (time2[CURR] - time2[PREV]);
-  speed_code2 += K*(commanded_speed-measured_speed2);
+  inc = K*(commanded_speed-measured_speed2);
+  if((double)speed_code2 + inc > MAX_SPEED) {
+    speed_code2 = MAX_SPEED;
+  } else if((double)speed_code2 + inc < -MAX_SPEED) {
+    speed_code2 = -MAX_SPEED;
+  } else {
+    speed_code2 += inc;
+  }
   if(lcd_update_flag) {
     Serial.print("\nspeed2 (m/s) = "); Serial.println(measured_speed2,6);
     Serial.print("new speed2 code = "); Serial.println((int)speed_code2);

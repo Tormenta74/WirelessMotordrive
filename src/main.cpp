@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
                 break;
             case QUIT:
                 // stop the robot and exit
-                send((char*)"D0",1);
+                send((char*)"D0",2);
                 return 0; // correct exit point
             default:
                 // it should never happen
