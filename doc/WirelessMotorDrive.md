@@ -1,8 +1,9 @@
+
 [Wireless Motordrive](https://github.com/Tormenta74/WirelessMotordrive)
 ===================
 Proyecto para la Actividad Práctica 4 de [Sistemas Empotrados y de Tiempo Real](https://www2.ulpgc.es/index.php?pagina=plan_estudio&ver=pantalla&numPantalla=99&nCodAsignatura=40840&codTitulacion=4008&codPlan=40&codEspecialidad=02), en la ULPGC.
 
-Por Diego Sáinz de Medrano.
+Copyright (c) 2017 Diego Sáinz de Medrano.
 
 # Tabla de contenidos
 
@@ -176,7 +177,13 @@ Por último, para el uso de la aplicación de consola, se utilizan los ficheros 
 
 Esto generará un ejecutable que toma como parámetro el puerto USB donde está conectado el coordinador XBee.
 
+### Dependencias
+
+Para compilar la aplicación de consola es necesaria la librería [libxbee por attie](https://github.com/attie/libxbee3). Los módulos XBee deben estar configurados en modo router y coordinador de forma previa con el software XCTU de Digi.
+
 # Referencias
+
+Fuentes de información útiles durante el desarrollo.
 
 - [AVR Library vprintf family bug](http://www.nongnu.org/avr-libc/user-manual/group__avr__stdio.html#gaa3b98c0d17b35642c0f3e4649092b9f1)
 El compilador para la familia AVR utilizado por el proyecto Arduino por defecto elimina parte de la implementación de los formatos de impresión, en concreto el formato `%f` para números en coma flotante. El 'workaround' es utilizar directamente un Makefile donde indicamos las banderas de linkeado necesarias para que funcione con propiedad.

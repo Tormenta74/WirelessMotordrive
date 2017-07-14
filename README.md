@@ -4,6 +4,8 @@ Proyecto para la Actividad Práctica 4 de [Sistemas Empotrados y de Tiempo Real]
 
 Copyright (c) 2017 Diego Sáinz de Medrano.
 
+Nota: para una mejor vista de esta documentación, abrir el fichero **doc**/`WirelessMotordrive.md.html` en un navegador provee mejor contenido. Para visualizarlo de forma perfecta, importe el fichero .md a [StackEdit](https://stackedit.io/editor).
+
 # Componentes
 
 Se han usado las siguientes piezas de hardware aparte de la placa Arduino Uno:
