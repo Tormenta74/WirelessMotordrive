@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
     // timing
     char *the_time_is = time_str(), *receit;
     printf("Program starting at %s\n",the_time_is);
-    send(the_time_is,MAX_TIME_STR);
+    send(the_time_is,MAX_TIME_STR+2);
     receit = receive(); // blocking call
     if(receit)
         printf("Router 1 ack: %s\n",receit);

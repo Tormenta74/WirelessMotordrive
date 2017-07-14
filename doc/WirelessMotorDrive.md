@@ -22,6 +22,15 @@ Se han usado las siguientes piezas de hardware aparte de la placa Arduino Uno:
 
 ![Montaje](sketch.png)
 
+Los colores de las líneas representan:
+
+Color | Línea
+-|-
+Rojo | Vcc
+Azul | GND
+Naranja | SDA
+Marrón | SCL
+
 # Operación del robot
 
 El robot está gobernado y coordinado mediante el uso del Timer2 y las interrupciones por overflow del mismo. El temporizador está configurado para producir una interrupción cada milisegundo, y cada cierto periodo de tiempo, actualiza una bandera para indicar que ciertas acciones pueden invocarse desde el loop principal.
@@ -70,7 +79,7 @@ K  | Actualizar la constante de regulación de velocidad
 # Interfaz de comandos
 En el otro extremo del software está la aplicación de consola que se encarga de comunicarse con el robot a través de un módulo XBee configurado como coordinador. La aplicación está dividida en módulos encargados de diferentes tareas, como el procesado de la entrada de texto, la obtención de la fecha actual y la comunicación per se (este último módulo está basado en la aplicación *super_serial*).
 
-Existen dos modos para interactuar con el robot, **normal** y **direccional**.
+Existen dos modos para interactuar con el robot, **normal** y **direccional**. En ambos modos la velocidad es medida de forma constante para proporcionar la información al display.
 
 ## Modo normal
 Se procesa la entrada de teclado como texto normal, y se reconocen los siguientes comandos:
@@ -80,13 +89,9 @@ Se procesa la entrada de teclado como texto normal, y se reconocen los siguiente
 - `constant <k>` : cambia la constante de proporción de regulación de velocidad.
 - `quit` : detiene el robot y cierra el programa.
 
-El módulo de control de velocidad consiste de una llamada a función que se realiza de forma síncrona con una señal del Timer2 que se activa cada 8ms. La función realiza las siguientes acciones:
+El módulo de control de velocidad consiste de una llamada a función que se realiza de forma síncrona con una señal del Timer2 que se activa cada 8ms. La función aumenta o disminuye el código de velocidad usando esta fórmula:
 
-- registrar el tiempo y el valor de los encoders del motor
-- calcular la velocidad real usando los datos previamente registrados
-- aumentar o disminuir el código de velocidad usando esta fórmula:
-
-	> speed_code += K * (commanded_speed - measured_speed)
+	speed_code += K * (commanded_speed - measured_speed)
 
 ## Modo direccional
 Se procesa el pulsado de las teclas en lugar de texto. Los controles son:
@@ -102,24 +107,20 @@ Se procesa el pulsado de las teclas en lugar de texto. Los controles son:
 
 En el LCD imprimiremos las informaciones relevantes actualizadas del robot. En el iniciado del sistema, se imprimirá un único mensaje mientras el tiempo no esté sincronizado: `start console`.
 
-Una vez iniciado el programa, habrá dos modos de display: uno para cuando estemos en modo direccional, en el que mostraremos:
-Esquina | Mensaje
--|-
-superior izquierda | Código de velocidad del motor izquierdo
-inferior izquierda | Código de velocidad del motor derecho
-superior derecha | Flecha direccional o símbolo de parada
-
-Las flechas direccionales son tanto propias del set de carácteres predefinidos como añadidas al inicio del programa mediante mapas de bits: ver [la documentación del LCD05](http://www.robot-electronics.co.uk/htm/Lcd05tech.htm) y los sketchs de ejemplo para más información.
-
-En el modo normal, mostraremos lo siguiente:
-
+En la pantalla mostraremos la siguiente información:
 Esquina | Mensaje
 -|-
 superior izquierda | Velocidad lineal del motor izquierdo
 inferior izquierda | Velocidad lineal del motor derecho
-superior derecha | Letra 'N'
+superior derecha | Unidades de medida más símbolo (ver abajo)
+inferior derecha | Hora y minuto actual
 
-Común a ambos modos es el mensaje de la esquina inferior derecha, que muestra la hora y el minuto actuales.
+El símbolo mencionado consistirá de una flecha que se corresponderá con la dirección seleccionada en caso de que estemos en modo direccional (en caso de estar detenido, se mostrará un cuadrado). Para el modo normal, se mostrará la letra 'N'.
+
+![Ejemplo del display](liquiddisplay.jpg)
+
+Las flechas direccionales son tanto propias del set de carácteres predefinidos como añadidas al inicio del programa mediante mapas de bits: ver [la documentación del LCD05](http://www.robot-electronics.co.uk/htm/Lcd05tech.htm) y los sketchs de ejemplo para más información (en particular: **arduino_sketches**/**lcd05_arrows**/, donde hay un fichero con los "bitmaps" y un sketch que muestra cómo se graban en la memoria extra. Ver también la propia librería del LCD05, que ha sido expandida de la proporcionada inicialmente por el autor.)
+
 
 # Ficheros
 
