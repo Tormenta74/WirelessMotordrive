@@ -22,6 +22,15 @@ Se han usado las siguientes piezas de hardware aparte de la placa Arduino Uno:
 
 ![Montaje](sketch.png)
 
+Los colores de las líneas representan:
+
+Color | Línea
+-|-
+Rojo | Vcc
+Azul | GND
+Naranja | SDA
+Marrón | SCL
+
 # Operación del robot
 
 El robot está gobernado y coordinado mediante el uso del Timer2 y las interrupciones por overflow del mismo. El temporizador está configurado para producir una interrupción cada milisegundo, y cada cierto periodo de tiempo, actualiza una bandera para indicar que ciertas acciones pueden invocarse desde el loop principal.
