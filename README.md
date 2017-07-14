@@ -1,13 +1,10 @@
-
-[Wireless Motordrive](https://github.com/Tormenta74/WirelessMotordrive)
+Wireless Motordrive
 ===================
 Proyecto para la Actividad Práctica 4 de [Sistemas Empotrados y de Tiempo Real](https://www2.ulpgc.es/index.php?pagina=plan_estudio&ver=pantalla&numPantalla=99&nCodAsignatura=40840&codTitulacion=4008&codPlan=40&codEspecialidad=02), en la ULPGC.
 
 Copyright (c) 2017 Diego Sáinz de Medrano.
 
-# Tabla de contenidos
-
-[TOC]
+Nota: para una mejor vista de esta documentación, abrir el fichero **doc**/`WirelessMotordrive.md.html` en un navegador provee mejor contenido. Para visualizarlo de forma perfecta, importe el fichero .md a [StackEdit](https://stackedit.io/editor).
 
 # Componentes
 
@@ -24,36 +21,12 @@ Se han usado las siguientes piezas de hardware aparte de la placa Arduino Uno:
 
 # Operación del robot
 
-El robot está gobernado y coordinado mediante el uso del Timer2 y las interrupciones por overflow del mismo. El temporizador está configurado para producir una interrupción cada milisegundo, y cada cierto periodo de tiempo, actualiza una bandera para indicar que ciertas acciones pueden invocarse desde el loop principal.
+![operation1](operation1.png)
 
-```sequence
-Note left of Timer2: each 512ms...
-Timer2->loop: lcd_update_flag = true
-Note right of loop: LCD05 command
-loop-->Timer2: lcd_update_flag = false
+![operation2](operation2.png)
 
-Note left of Timer2: each 16ms...
-Timer2->loop: speed_check_flag = true
-Note right of loop: RD02 speed regulations
-loop-->Timer2: speed_check_flag = false
-```
+![operation3](operation3.png)
 
-Una simplificación de las tareas relacionadas con el uso de las dos piezas de hardware más visibles del robot es la siguiente:
-
-```flow
-st=>start: Loop begin
-e=>end: Loop end
-op1=>operation: Speed regulation
-op2=>operation: Liquid Display update
-cond=>condition: Speed check flag?
-cond1=>condition: LCD Update flag?
-
-st->cond
-cond(yes)->op1->cond1
-cond(no)->cond1
-cond1(yes)->op2->e
-cond1(no)->e
-```
 Nota: estas comprobaciones sólo se realizan una vez un comando de sincronización temporal ha sido recibido.
 
 Después de realizar estas comprobaciones, se procede a comprobar si existen nuevos mensajes recibidos vía el router XBee montado sobre el wireless SD shield. De haberlo, se procesa de la siguiente manera:
@@ -72,31 +45,32 @@ En el otro extremo del software está la aplicación de consola que se encarga d
 
 Existen dos modos para interactuar con el robot, **normal** y **direccional**.
 
+
 ## Modo normal
 Se procesa la entrada de teclado como texto normal, y se reconocen los siguientes comandos:
 
-- `speed <s>` : acelera o decelera el robot hasta alcanzar la velocidad `s` (medida en mm/s)
-- `toggle` : cambia a modo direccional
-- `constant <k>` : cambia la constante de proporción de regulación de velocidad.
-- `quit` : detiene el robot y cierra el programa.
+* `speed <s>` : acelera o decelera el robot hasta alcanzar la velocidad `s` (medida en mm/s)
+* `toggle` : cambia a modo direccional
+* `constant <k>` : cambia la constante de proporción de regulación de velocidad.
+* `quit` : detiene el robot y cierra el programa.
 
 El módulo de control de velocidad consiste de una llamada a función que se realiza de forma síncrona con una señal del Timer2 que se activa cada 8ms. La función realiza las siguientes acciones:
 
-- registrar el tiempo y el valor de los encoders del motor
-- calcular la velocidad real usando los datos previamente registrados
-- aumentar o disminuir el código de velocidad usando esta fórmula:
+* registrar el tiempo y el valor de los encoders del motor
+* calcular la velocidad real usando los datos previamente registrados
+* aumentar o disminuir el código de velocidad usando esta fórmula:
 
 	> speed_code += K * (commanded_speed - measured_speed)
 
 ## Modo direccional
 Se procesa el pulsado de las teclas en lugar de texto. Los controles son:
 
-- `a/A` : girar a la izquierda
-- `d/D` : girar a la derecha
-- `w/W` : hacia delante
-- `s/S` : hacia atrás
-- `m/M` : cambiar a modo normal
-- `<space>` : parar
+* `a/A` : girar a la izquierda
+* `d/D` : girar a la derecha
+* `w/W` : hacia delante
+* `s/S` : hacia atrás
+* `m/M` : cambiar a modo normal
+* `<space>` : parar
 
 # Liquid Crystal Display
 
@@ -123,47 +97,47 @@ Común a ambos modos es el mensaje de la esquina inferior derecha, que muestra l
 
 # Ficheros
 
-- **arduino_libs**
- - **lcd05**
-  -- **examples**
-  -- `keywords.txt`
-  -- `lcd05.cpp`
-  -- `lcd05.h`
-  -- `library.properties`
- - **rd02**
-  -- **examples**
-  -- `keywords.txt`
-  -- `rd02.cpp`
-  -- `rd02.h`
-  -- `library.properties`
- - **Time**  - github.com/PaulStoffregen
- - **Xbee** - github.com/andrewrapp
-- **arduino_sketches** - sketches para probar las librerías
- - **lcd05_arrows**
- - **lcd05_display**
- - **lcd05_time_display**
- - **lcd05_with_lib**
- - **rd02_measuring**
- - **rd02_with_lib**
-- **doc**
- - **css** - hojas de estilo para la documentación en html
- - `WirelessMotordrive.md`
- - `WirelessMotordrive.md.html`
-- **include**
- - `commands.h`
- - `connect.h`
- - `controls.h`
- - `timing.h`
-- **sketch**
- - `Makefile`
- - `xbee_bridge.ino`
-- **src**
- - `commands.cpp` - 
- - `connect.cpp`
- - `controls.cpp`
- - `main.cpp`
- - `timing.cpp`
-- `CMakeLists.txt`
+* **arduino_libs**
+  * **lcd05**
+    * **examples**
+    * `keywords.txt`
+    * `lcd05.cpp`
+    * `lcd05.h`
+    * `library.properties`
+  * **rd02**
+    * **examples**
+    * `keywords.txt`
+    * `rd02.cpp`
+    * `rd02.h`
+    * `library.properties`
+  * **Time**  - github.com/PaulStoffregen
+  * **Xbee** - github.com/andrewrapp
+* **arduino_sketches** - sketches para probar las librerías
+  * **lcd05_arrows**
+  * **lcd05_display**
+  * **lcd05_time_display**
+  * **lcd05_with_lib**
+  * **rd02_measuring**
+  * **rd02_with_lib**
+* **doc**
+  * **css** - hojas de estilo para la documentación en html
+  * `WirelessMotordrive.md`
+  * `WirelessMotordrive.md.html`
+* **include**
+  * `commands.h`
+  * `connect.h`
+  * `controls.h`
+  * `timing.h`
+* **sketch**
+  * `Makefile`
+  * `xbee_bridge.ino`
+* **src**
+  * `commands.cpp` - 
+  * `connect.cpp`
+  * `controls.cpp`
+  * `main.cpp`
+  * `timing.cpp`
+* `CMakeLists.txt`
 
 ## Instalación
 Para utilizar los sketches hace falta incluir las librerías bajo el directorio **arduino_libs** en el directorio de librerías de usuario de la instalación de Arduino en el sistema, normalmente `$HOME/Arduino/libraries`. Su uso en otros sketches está facilitado gracias a los ficheros `library.properties`, que autoinserta el `#include` necesario en los códigos fuentes al importar las librerías. También hay pequeños ejemplos incluidos en las mismas.
@@ -177,13 +151,7 @@ Por último, para el uso de la aplicación de consola, se utilizan los ficheros 
 
 Esto generará un ejecutable que toma como parámetro el puerto USB donde está conectado el coordinador XBee.
 
-### Dependencias
-
-Para compilar la aplicación de consola es necesaria la librería [libxbee por attie](https://github.com/attie/libxbee3). Los módulos XBee deben estar configurados en modo router y coordinador de forma previa con el software XCTU de Digi.
-
 # Referencias
-
-Fuentes de información útiles durante el desarrollo.
 
 - [AVR Library vprintf family bug](http://www.nongnu.org/avr-libc/user-manual/group__avr__stdio.html#gaa3b98c0d17b35642c0f3e4649092b9f1)
 El compilador para la familia AVR utilizado por el proyecto Arduino por defecto elimina parte de la implementación de los formatos de impresión, en concreto el formato `%f` para números en coma flotante. El 'workaround' es utilizar directamente un Makefile donde indicamos las banderas de linkeado necesarias para que funcione con propiedad.
